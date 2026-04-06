@@ -1,0 +1,44 @@
+# === Xcode ===
+DerivedData/
+build/
+*.xcworkspace
+xcuserdata/
+*.xcuserstate
+
+# Keep workspace if you use CocoaPods or SwiftPM
+!*.xcworkspace/contents.xcworkspacedata
+
+# === Swift Package Manager ===
+.build/
+Packages/
+
+# SwiftPM
+.build/
+Packages/
+
+# === CocoaPods ===
+Pods/
+
+# Xcode
+DerivedData/
+xcuserdata/
+
+# === Carthage ===
+Carthage/Build/
+
+# === macOS ===
+.DS_Store
+
+# === Logs ===
+*.log
+
+# === Firebase ===
+GoogleService-Info.plist
+
+# === Secrets / Env ===
+.env
+*.key
+*.pem
+
+# === Misc ===
+*.swp
