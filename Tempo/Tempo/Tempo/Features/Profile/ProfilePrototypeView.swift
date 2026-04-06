@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 struct ProfilePrototypeView: View {
   @EnvironmentObject var auth: AuthViewModel
@@ -34,7 +35,7 @@ struct ProfilePrototypeView: View {
                     }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Tempo Runner")
+                    Text(auth.user?.displayName ?? "Tempo Runner")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(TempoColor.ink)
 

@@ -96,7 +96,11 @@ struct SignUpView: View {
 
                 Button("Create Account") {
                     Task {
-                        await auth.signUp(email: email, password: password)
+                        await auth.signUp(
+                            fullName: fullName,
+                            email: email,
+                            password: password
+                        )
                     }
                 }
                 .buttonStyle(TempoPrimaryButtonStyle())

@@ -20,17 +20,20 @@ class AuthViewModel: ObservableObject {
         self.user = Auth.auth().currentUser
     }
 
-    func signUp(email: String, password: String) async {
-        isLoading = true
-        errorMessage = nil
-        do {
-            let result = try await Auth.auth().createUser(withEmail: email, password: password)
-            self.user = result.user
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isLoading = false
-    }
+    func signUp(fullName: String, email: String, password: String) async {
+          do {
+              let result = try await Auth.auth().createUser(withEmail: email, password: password)
+
+              let changeRequest = result.user.createProfileChangeRequest()
+              changeRequest.displayName = fullName
+              try await changeRequest.commitChanges()
+
+              try await result.user.reload()
+              self.user = Auth.auth().currentUser
+          } catch {
+              errorMessage = error.localizedDescription
+          }
+      }
 
     func signIn(email: String, password: String) async {
         isLoading = true
