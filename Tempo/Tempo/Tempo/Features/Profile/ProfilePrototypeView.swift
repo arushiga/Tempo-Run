@@ -21,6 +21,18 @@ struct ProfilePrototypeView: View {
         .background(TempoGradient.appBackground.ignoresSafeArea())
         .navigationTitle("Profile")
     }
+  
+    private func initials(from name: String?) -> String {
+        guard let name = name, !name.isEmpty else { return "?" }
+
+        let components = name.split(separator: " ")
+        
+        let first = components.first?.first
+        let last = components.count > 1 ? components.last?.first : nil
+        
+        return "\(first.map { String($0) } ?? "")\(last.map { String($0) } ?? "")".uppercased()
+    }
+  
 
     private var profileHeader: some View {
         GlassCard {
@@ -29,7 +41,7 @@ struct ProfilePrototypeView: View {
                     .fill(TempoGradient.hero)
                     .frame(width: 76, height: 76)
                     .overlay {
-                        Text("TJ")
+                        Text(initials(from: auth.user?.displayName))
                             .font(.title2.weight(.bold))
                             .foregroundStyle(.white)
                     }
@@ -38,8 +50,8 @@ struct ProfilePrototypeView: View {
                     Text(auth.user?.displayName ?? "Tempo Runner")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(TempoColor.ink)
-
-                    Text("Friends, past activities, and training progress will render here from Firestore.")
+                  
+                    Text(auth.user?.email ?? "Tempo Runner")
                         .font(.subheadline)
                         .foregroundStyle(TempoColor.slate)
                 }
