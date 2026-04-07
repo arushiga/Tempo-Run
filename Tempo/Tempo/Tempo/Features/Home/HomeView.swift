@@ -34,6 +34,10 @@ struct HomeView: View {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .fill(TempoGradient.hero)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(Color.white.opacity(0.35), lineWidth: 1)
+        )
         .shadow(color: TempoColor.primary.opacity(0.24), radius: 18, y: 10)
     }
 

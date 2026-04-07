@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct HelloStylesView: View {
-    private let accent = Color(red: 0.16, green: 0.47, blue: 0.91)
-    private let surface = Color(red: 0.95, green: 0.97, blue: 1.0)
-    private let ink = Color(red: 0.09, green: 0.12, blue: 0.19)
+    private let accent = TempoColor.primary
+    private let surface = TempoColor.surface
+    private let ink = TempoColor.ink
 
     var body: some View {
         ScrollView {
@@ -16,11 +16,7 @@ struct HelloStylesView: View {
             .padding(24)
         }
         .background(
-            LinearGradient(
-                colors: [Color.white, Color(red: 0.92, green: 0.96, blue: 1.0)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            TempoGradient.appBackground
         )
         .navigationTitle("Hello Styles")
         .navigationBarTitleDisplayMode(.inline)
@@ -32,7 +28,7 @@ struct HelloStylesView: View {
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .foregroundStyle(ink)
 
-            Text("A small style board for Tempo's first SwiftUI screen.")
+            Text("Tempo's Hello Style screen with core style elements.")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
@@ -59,11 +55,7 @@ struct HelloStylesView: View {
         .background(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(
-                    LinearGradient(
-                        colors: [accent.opacity(0.95), Color(red: 0.39, green: 0.73, blue: 0.98)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                    TempoGradient.hero
                 )
         )
         .overlay(
@@ -85,11 +77,11 @@ struct HelloStylesView: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(ink)
 
-                Text("Body copy gives you room for concise product messaging and helper text.")
+                Text("This is an example of the body text for our application.")
                     .font(.body)
                     .foregroundStyle(.secondary)
 
-                Text("Caption / Meta")
+                Text("Caption")
                     .font(.caption.weight(.medium))
                     .textCase(.uppercase)
                     .tracking(1.2)
@@ -135,7 +127,7 @@ struct HelloStylesView: View {
             HStack(spacing: 12) {
                 paletteSwatch(name: "Accent", color: accent)
                 paletteSwatch(name: "Surface", color: surface)
-                paletteSwatch(name: "Ink", color: ink)
+                paletteSwatch(name: "Font Color", color: ink)
             }
         }
     }
@@ -153,6 +145,10 @@ struct HelloStylesView: View {
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(.white.opacity(0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(TempoColor.line, lineWidth: 1)
         )
     }
 

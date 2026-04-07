@@ -3,14 +3,10 @@ import SwiftUI
 struct HelloWorldView: View {
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "globe")
-                .font(.system(size: 54))
-                .foregroundStyle(.tint)
-
             Text("Hello, world!")
                 .font(.largeTitle.weight(.bold))
 
-            Text("This is the basic SwiftUI hello page for Tempo.")
+            Text("This is the basic Hello World page for Tempo.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

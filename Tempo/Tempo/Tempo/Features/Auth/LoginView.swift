@@ -48,13 +48,11 @@ struct LoginView: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [TempoColor.ink, TempoColor.primary],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(TempoGradient.hero)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .stroke(Color.white.opacity(0.35), lineWidth: 1)
         )
     }
 

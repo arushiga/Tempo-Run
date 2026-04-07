@@ -19,7 +19,7 @@ struct GlassCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .stroke(TempoColor.line, lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.06), radius: 18, y: 8)
+            .shadow(color: TempoColor.primary.opacity(0.12), radius: 18, y: 8)
     }
 }
 
