@@ -20,9 +20,23 @@
 		2018AE792F835DE8000A39DB /* Tempo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tempo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		409B44912F8D76E90079AF7D /* Exceptions for "Tempo" folder in "Tempo" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Tempo/Resources/[Spring 2026] Final Project Guide.pdf",
+				"Tempo/Resources/Project Timeline & Tasks.pdf",
+			);
+			target = 2018AE782F835DE8000A39DB /* Tempo */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2018AE7B2F835DE8000A39DB /* Tempo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				409B44912F8D76E90079AF7D /* Exceptions for "Tempo" folder in "Tempo" target */,
+			);
 			path = Tempo;
 			sourceTree = "<group>";
 		};
