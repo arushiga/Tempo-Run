@@ -27,6 +27,9 @@ struct PlannerGridView: View {
                     }
                 }
 
+                // Distance sliders — one per day, expandable
+                distanceSlidersSection
+
                 Text("Tip: drag from the run types below or drag an existing workout to move it.")
                     .font(.caption)
                     .foregroundStyle(TempoColor.slate)
@@ -40,11 +43,64 @@ struct PlannerGridView: View {
             Spacer()
                 .frame(width: 32)
 
-            ForEach(Array(viewModel.dayLabels.enumerated()), id: \.offset) { _, label in
-                Text(label)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(TempoColor.ink)
+            ForEach(Array(viewModel.dayLabels.enumerated()), id: \.offset) { index, label in
+                Button {
+                    viewModel.toggleDay(index)
+                } label: {
+                    VStack(spacing: 2) {
+                        Text(label)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(TempoColor.ink)
+                        if !viewModel.runsForDay(index).isEmpty {
+                            Image(systemName: viewModel.expandedDays.contains(index) ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(TempoColor.primary)
+                        }
+                    }
                     .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var distanceSlidersSection: some View {
+        ForEach(Array(viewModel.dayLabels.enumerated()), id: \.offset) { dayIndex, label in
+            let runs = viewModel.runsForDay(dayIndex)
+            if viewModel.expandedDays.contains(dayIndex) && !runs.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("\(label) — Planned Distance")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TempoColor.slate)
+
+                    ForEach(runs) { run in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Image(systemName: run.type.symbolName)
+                                    .foregroundStyle(run.type.color)
+                                    .font(.caption)
+                                Text(run.type.shortLabel)
+                                    .font(.caption)
+                                    .foregroundStyle(TempoColor.ink)
+                                Spacer()
+                                Text(run.distanceMiles == 0 ? "—" : String(format: "%.1f mi", run.distanceMiles))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(TempoColor.primary)
+                            }
+                            Slider(
+                                value: Binding(
+                                    get: { run.distanceMiles },
+                                    set: { viewModel.setDistance($0, for: run.id) }
+                                ),
+                                in: 0...26.2,
+                                step: 0.1
+                            )
+                            .tint(run.type.color)
+                        }
+                    }
+                }
+                .padding(.top, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
@@ -82,10 +138,7 @@ struct PlannerCellView: View {
         .scaleEffect(isTargeted ? 1.08 : 1)
         .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isTargeted)
         .dropDestination(for: PlannerDragItem.self) { items, _ in
-            guard let item = items.first else {
-                return false
-            }
-
+            guard let item = items.first else { return false }
             switch item {
             case .runType(let runType):
                 viewModel.addOrReplaceRun(type: runType, day: day, timeOfDay: timeOfDay)
@@ -104,26 +157,14 @@ struct PlannerCellView: View {
     }
 
     private func cellBackground(for scheduledRun: ScheduledRun?) -> Color {
-        if let scheduledRun {
-            return scheduledRun.type.color.opacity(0.12)
-        }
-
-        if isTargeted {
-            return TempoColor.primary.opacity(0.1)
-        }
-
+        if let scheduledRun { return scheduledRun.type.color.opacity(0.12) }
+        if isTargeted { return TempoColor.primary.opacity(0.1) }
         return .white.opacity(0.9)
     }
 
     private func cellBorder(for scheduledRun: ScheduledRun?) -> Color {
-        if isTargeted {
-            return TempoColor.primary
-        }
-
-        if let scheduledRun {
-            return scheduledRun.type.color
-        }
-
+        if isTargeted { return TempoColor.primary }
+        if let scheduledRun { return scheduledRun.type.color }
         return Color.gray.opacity(0.2)
     }
 }

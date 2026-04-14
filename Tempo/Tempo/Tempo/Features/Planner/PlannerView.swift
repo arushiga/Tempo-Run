@@ -2,11 +2,13 @@ import SwiftUI
 
 struct PlannerView: View {
     @State private var viewModel = PlannerViewModel()
+    @Environment(AppDataStore.self) private var store
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 plannerHeader
+                weekNavBar
                 PlannerGridView(viewModel: viewModel)
                 RunTypePickerView()
                 PlannerStatsView(viewModel: viewModel)
@@ -16,6 +18,9 @@ struct PlannerView: View {
         }
         .background(TempoGradient.appBackground.ignoresSafeArea())
         .navigationTitle("Planner")
+        .onDisappear {
+            viewModel.saveCurrent(store: store)
+        }
     }
 
     private var plannerHeader: some View {
@@ -39,6 +44,35 @@ struct PlannerView: View {
                 .fill(TempoGradient.hero)
         )
         .shadow(color: TempoColor.primary.opacity(0.24), radius: 18, y: 10)
+    }
+
+    private var weekNavBar: some View {
+        HStack {
+            Button {
+                viewModel.goToPrevWeek(store: store)
+            } label: {
+                Image(systemName: "chevron.left.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(TempoColor.primary)
+            }
+
+            Spacer()
+
+            Text("Week of \(viewModel.weekDisplayString)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(TempoColor.ink)
+
+            Spacer()
+
+            Button {
+                viewModel.goToNextWeek(store: store)
+            } label: {
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(TempoColor.primary)
+            }
+        }
+        .padding(.horizontal, 8)
     }
 }
 
