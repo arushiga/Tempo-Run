@@ -20,23 +20,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
 @main
 struct TempoApp: App {
-  @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-  @StateObject private var auth = AuthViewModel()
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @StateObject private var auth = AuthViewModel()
+    @State private var store = AppDataStore()
 
-     var body: some Scene {
-         WindowGroup {
-             if auth.user != nil {
-                 // User is logged in — show main app
-                 AppShellView()
-                     .environmentObject(auth)
-             } else {
-                 // Not logged in — show login
-                 NavigationStack {
-                     LoginView()
-                 }
-                 .environmentObject(auth)
-             }
-         }
-     }
-
+    var body: some Scene {
+        WindowGroup {
+            if auth.user != nil {
+                AppShellView()
+                    .environmentObject(auth)
+                    .environment(store)
+            } else {
+                NavigationStack {
+                    LoginView()
+                }
+                .environmentObject(auth)
+                .environment(store)
+            }
+        }
+    }
 }

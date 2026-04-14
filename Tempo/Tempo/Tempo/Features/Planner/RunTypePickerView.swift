@@ -3,7 +3,7 @@ import SwiftUI
 struct RunTypePickerView: View {
     var body: some View {
         GlassCard {
-            VStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 18) {
                 Text("Run Types")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(TempoColor.ink)
@@ -25,15 +25,15 @@ private struct PlannerRunTypeToken: View {
     var body: some View {
         VStack(spacing: 8) {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(runType.color.opacity(0.12))
+                .fill(TempoColor.surfaceMuted)
                 .frame(width: 58, height: 58)
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(runType.color, lineWidth: 2)
+                        .stroke(TempoColor.line, lineWidth: 1)
                 }
                 .overlay {
                     Image(systemName: runType.symbolName)
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(runType.color)
                 }
                 .scaleEffect(isDragging ? 0.92 : 1)
@@ -41,11 +41,11 @@ private struct PlannerRunTypeToken: View {
 
             Text(runType.shortLabel)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(TempoColor.slate)
+                .foregroundStyle(TempoColor.muted)
         }
         .draggable(PlannerDragItem.runType(runType)) {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(runType.color.opacity(0.15))
+                .fill(TempoColor.surface)
                 .frame(width: 60, height: 60)
                 .overlay {
                     Image(systemName: runType.symbolName)

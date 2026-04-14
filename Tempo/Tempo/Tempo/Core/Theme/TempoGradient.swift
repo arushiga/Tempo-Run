@@ -2,20 +2,20 @@ import SwiftUI
 
 enum TempoGradient {
     static let appBackground = LinearGradient(
-        colors: [TempoColor.backgroundTop, Color.white, TempoColor.backgroundBottom],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
+        colors: [TempoColor.backgroundTop, TempoColor.backgroundBottom],
+        startPoint: .top,
+        endPoint: .bottom
     )
 
     static let hero = LinearGradient(
-        colors: [TempoColor.primary, TempoColor.accent],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
+        colors: [TempoColor.surfaceStrong, TempoColor.surfaceStrong],
+        startPoint: .top,
+        endPoint: .bottom
     )
 
     static let success = LinearGradient(
-        colors: [TempoColor.secondary, Color.green],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
+        colors: [TempoColor.surfaceMuted, TempoColor.surfaceMuted],
+        startPoint: .top,
+        endPoint: .bottom
     )
 }

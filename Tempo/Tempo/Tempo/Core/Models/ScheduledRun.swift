@@ -5,12 +5,14 @@ struct ScheduledRun: Identifiable, Codable, Hashable {
     var type: RunType
     var day: Int
     var timeOfDay: TimeOfDay
+    var distanceMiles: Double = 0
 
-    init(id: UUID = UUID(), type: RunType, day: Int, timeOfDay: TimeOfDay) {
+    init(id: UUID = UUID(), type: RunType, day: Int, timeOfDay: TimeOfDay, distanceMiles: Double = 0) {
         self.id = id
         self.type = type
         self.day = day
         self.timeOfDay = timeOfDay
+        self.distanceMiles = distanceMiles
     }
 }
 
