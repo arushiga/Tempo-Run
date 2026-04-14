@@ -33,13 +33,16 @@ struct ProfileView: View {
                 weeklyPlannerReviewCard
                 allTimeStatsCard
                 achievementsCard
-                Button("Log Out") { auth.signOut() }
+                Button("Log Out") { auth.signOut(store: store) }
                     .buttonStyle(TempoPrimaryButtonStyle())
             }
             .padding(.horizontal, 24).padding(.vertical, 20)
         }
         .background(TempoGradient.appBackground.ignoresSafeArea())
         .navigationTitle("Profile")
+        .task {
+                await store.loadActivitiesFromFirebase()
+        }
     }
 
     // MARK: - Hero

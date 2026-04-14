@@ -47,8 +47,16 @@ class AuthViewModel: ObservableObject {
         isLoading = false
     }
 
-    func signOut() {
+    func signOut(store: AppDataStore) {
         try? Auth.auth().signOut()
         self.user = nil
+        store.clearUserData()
+    }
+
+    private func clearLocalCache() {
+        let keys = UserDefaults.standard.dictionaryRepresentation().keys
+        keys.filter { $0.hasPrefix("tempo_") }.forEach {
+            UserDefaults.standard.removeObject(forKey: $0)
+        }
     }
 }

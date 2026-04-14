@@ -27,9 +27,14 @@ struct TempoApp: App {
     var body: some Scene {
         WindowGroup {
             if auth.user != nil {
-                AppShellView()
-                    .environmentObject(auth)
-                    .environment(store)
+              AppShellView()
+                      .environmentObject(auth)
+                      .environment(store)
+                      .onChange(of: auth.user) { _, newUser in
+                          if newUser != nil {
+                              Task { await store.loadActivitiesFromFirebase() }
+                          }
+                      }
             } else {
                 NavigationStack {
                     LoginView()

@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import FirebaseFirestore
+import FirebaseAuth
 
 struct DailyMileagePoint: Identifiable {
     let id: Int
@@ -28,9 +30,27 @@ struct WeeklyReview {
     }
 }
 
+struct WeeklyStats: Codable {
+    var weekStart: String
+    var runs: Int
+    var totalMiles: Double
+    var totalSeconds: Int
+    var avgPaceSeconds: Int
+}
+
+struct UserProfile: Codable {
+    var fullName: String
+    var email: String
+    var weeklyMileageGoal: Double
+    var weeklyRunGoal: Int
+    var allTimeMileGoal: Double
+}
+
 @Observable
 final class AppDataStore {
     private(set) var activities: [Activity] = []
+    private var uid: String { Auth.auth().currentUser?.uid ?? "guest" }
+
 
     private let activitiesKey = "tempo_activities"
     private func weekKey(_ ws: String) -> String { "tempo_week_\(ws)" }
@@ -46,6 +66,8 @@ final class AppDataStore {
             UserDefaults.standard.set(data, forKey: activitiesKey)
         }
         activities = all
+        saveActivity(activity)
+        saveWeeklyStats(weekStart: Self.currentWeekStart())
     }
 
     private func load() {
@@ -70,6 +92,46 @@ final class AppDataStore {
     func saveWeekPlan(_ runs: [ScheduledRun], weekStart: String) {
         if let data = try? JSONEncoder().encode(runs) {
             UserDefaults.standard.set(data, forKey: weekKey(weekStart))
+        }
+        saveWeekPlanToFirebase(runs, weekStart: weekStart)
+    }
+    
+    func saveWeekPlanToFirebase(_ runs: [ScheduledRun], weekStart: String) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let data = runs.map { run -> [String: Any] in
+            [
+                "id": run.id.uuidString,
+                "type": run.type.rawValue,
+                "day": run.day,
+                "timeOfDay": run.timeOfDay.rawValue,
+                "distanceMiles": run.distanceMiles
+            ]
+        }
+        db.collection("users").document(uid)
+            .collection("weekPlans").document(weekStart)
+            .setData(["runs": data, "weekStart": weekStart])
+    }
+
+    func loadWeekPlanFromFirebase(_ weekStart: String) async -> [ScheduledRun] {
+        guard let uid = Auth.auth().currentUser?.uid else { return [] }
+        do {
+            let doc = try await db.collection("users").document(uid)
+                .collection("weekPlans").document(weekStart)
+                .getDocument()
+            guard let runsData = doc.data()?["runs"] as? [[String: Any]] else { return [] }
+            return runsData.compactMap { dict -> ScheduledRun? in
+                guard
+                    let idStr = dict["id"] as? String, let id = UUID(uuidString: idStr),
+                    let typeStr = dict["type"] as? String, let type_ = RunType(rawValue: typeStr),
+                    let day = dict["day"] as? Int,
+                    let todStr = dict["timeOfDay"] as? String, let tod = TimeOfDay(rawValue: todStr),
+                    let miles = dict["distanceMiles"] as? Double
+                else { return nil }
+                return ScheduledRun(id: id, type: type_, day: day, timeOfDay: tod, distanceMiles: miles)
+            }
+        } catch {
+            print("Failed to load week plan: \(error)")
+            return []
         }
     }
 
@@ -170,7 +232,102 @@ final class AppDataStore {
             )
         }
     }
+  
+    // MARK: - Firebase Sync
+    func saveActivity(_ activity: Activity) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        do {
+            try db.collection("users").document(uid)
+                .collection("activities").document(activity.id)
+                .setData(from: activity)
+        } catch {
+            print("Failed to save activity: \(error)")
+        }
+    }
 
+    func loadActivitiesFromFirebase() async {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        do {
+            let snapshot = try await db.collection("users").document(uid)
+                .collection("activities")
+                .order(by: "completionDate", descending: true)
+                .getDocuments()
+            let fetched = try snapshot.documents.compactMap {
+                try $0.data(as: Activity.self)
+            }
+            activities = fetched.isEmpty ? [] : fetched
+            if let data = try? JSONEncoder().encode(fetched) {
+                UserDefaults.standard.set(data, forKey: activitiesKey)
+            }
+            
+        } catch {
+            print("Failed to load activities: \(error)")
+        }
+    }
+
+    private var db: Firestore { Firestore.firestore() }
+
+    private func userStatsCollection() throws -> CollectionReference {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "AuthError", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not logged in"])
+        }
+        return db.collection("users").document(uid).collection("weeklyStats")
+    }
+
+    func saveWeeklyStats(weekStart: String) {
+        let acts = weekActivities(weekStart)
+        let stats = WeeklyStats(
+            weekStart: weekStart,
+            runs: acts.count,
+            totalMiles: totalMiles(acts),
+            totalSeconds: acts.reduce(0) { $0 + $1.durationSeconds },
+            avgPaceSeconds: avgPaceSeconds(acts)
+        )
+        do {
+            try userStatsCollection()
+                .document(weekStart)
+                .setData(from: stats)
+        } catch {
+            print("Failed to save weekly stats: \(error)")
+        }
+    }
+
+    func loadWeeklyStatsFromFirebase(weekStart: String) async -> WeeklyStats? {
+        do {
+            let doc = try await userStatsCollection()
+                .document(weekStart)
+                .getDocument()
+            return try doc.data(as: WeeklyStats.self)
+        } catch {
+            print("Failed to load weekly stats: \(error)")
+            return nil
+        }
+    }
+  
+    func saveProfile(_ profile: UserProfile) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        do {
+            try db.collection("users").document(uid).setData(from: profile, merge: true)
+        } catch {
+            print("Failed to save profile: \(error)")
+        }
+    }
+
+    func loadProfile() async -> UserProfile? {
+        guard let uid = Auth.auth().currentUser?.uid else { return nil }
+        do {
+            let doc = try await db.collection("users").document(uid).getDocument()
+            return try doc.data(as: UserProfile.self)
+        } catch {
+            print("Failed to load profile: \(error)")
+            return nil
+        }
+    }
+  
+    func clearUserData() {
+        activities = []
+    }
+  
     // MARK: - Static Date Utilities
 
     static func currentWeekStart() -> String {

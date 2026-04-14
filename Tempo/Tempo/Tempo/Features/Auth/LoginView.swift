@@ -101,15 +101,15 @@ struct LoginView: View {
               
                 Divider()
 
-                Text("or continue with")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(TempoColor.slate)
-                    .frame(maxWidth: .infinity)
-
-                HStack(spacing: 12) {
-                    socialButton(title: "Google", icon: "globe")
-                    socialButton(title: "Apple", icon: "apple.logo")
-                }
+//                Text("or continue with")
+//                    .font(.subheadline.weight(.medium))
+//                    .foregroundStyle(TempoColor.slate)
+//                    .frame(maxWidth: .infinity)
+//
+//                HStack(spacing: 12) {
+//                    socialButton(title: "Google", icon: "globe")
+//                    socialButton(title: "Apple", icon: "apple.logo")
+//                }
 
                 HStack(spacing: 4) {
                     Text("Don't have an account?")
@@ -128,12 +128,12 @@ struct LoginView: View {
         }
     }
 
-    private var footer: some View {
-        Text("Prototype only: Firebase Auth wiring comes next.")
-            .font(.caption)
-            .foregroundStyle(TempoColor.slate)
-            .padding(.bottom, 12)
-    }
+//    private var footer: some View {
+//        Text("Prototype only: Firebase Auth wiring comes next.")
+//            .font(.caption)
+//            .foregroundStyle(TempoColor.slate)
+//            .padding(.bottom, 12)
+//    }
 
     private func socialButton(title: String, icon: String) -> some View {
         Button {

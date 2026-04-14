@@ -18,6 +18,12 @@ struct PlannerView: View {
         }
         .background(TempoGradient.appBackground.ignoresSafeArea())
         .navigationTitle("Planner")
+        .task {
+            let runs = await store.loadWeekPlanFromFirebase(viewModel.currentWeekStart)
+            if !runs.isEmpty {
+                viewModel.scheduledRuns = runs
+            }
+        }
         .onChange(of: viewModel.scheduledRuns) { _, _ in
             viewModel.saveCurrent(store: store)
         }
