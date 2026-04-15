@@ -6,13 +6,15 @@ struct LoginView: View {
     @State private var password = ""
     @State private var rememberMe = true
     @State private var showsPassword = false
+    @State private var resetEmailSent = false
+
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 header
                 formCard
-                footer
+//                footer
             }
             .padding(20)
         }
@@ -80,9 +82,21 @@ struct LoginView: View {
                     Spacer()
 
                     Button("Forgot Password?") {
+                      Task {
+                              await auth.resetPassword(email: email)
+                              if auth.errorMessage == nil {
+                                  resetEmailSent = true
+                              }
+                          }
                     }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(TempoColor.primary)
+                }
+                
+                if resetEmailSent {
+                    Text("Password reset email sent — check your inbox.")
+                        .font(.caption)
+                        .foregroundStyle(TempoColor.secondary)
                 }
 
                 Button("Sign In") {

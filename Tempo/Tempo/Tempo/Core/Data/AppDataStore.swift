@@ -72,11 +72,8 @@ final class AppDataStore {
 
     private func load() {
         if let data = UserDefaults.standard.data(forKey: activitiesKey),
-           let decoded = try? JSONDecoder().decode([Activity].self, from: data),
-           !decoded.isEmpty {
-            activities = decoded
-        } else {
-            activities = SeedData.activities
+           let decoded = try? JSONDecoder().decode([Activity].self, from: data) {
+           activities = decoded
         }
     }
 
@@ -326,6 +323,7 @@ final class AppDataStore {
   
     func clearUserData() {
         activities = []
+        UserDefaults.standard.removeObject(forKey: activitiesKey)
     }
   
     // MARK: - Static Date Utilities
