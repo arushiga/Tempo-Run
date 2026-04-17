@@ -30,8 +30,9 @@ struct SignUpView: View {
                 .fill(.white.opacity(0.2))
                 .frame(width: 84, height: 84)
                 .overlay {
-                    Text("🎯")
-                        .font(.system(size: 36))
+                      Image(systemName: "figure.run")
+                          .font(.system(size: 36))
+                          .foregroundStyle(.white)
                 }
                 .overlay {
                     Circle()

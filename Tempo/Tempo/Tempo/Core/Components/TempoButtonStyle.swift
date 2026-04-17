@@ -3,14 +3,14 @@ import SwiftUI
 struct TempoPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
+            .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(TempoGradient.hero)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .opacity(configuration.isPressed ? 0.92 : 1)
+            .padding(.vertical, 15)
+            .background(TempoColor.primary)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .opacity(configuration.isPressed ? 0.96 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
@@ -18,18 +18,18 @@ struct TempoPrimaryButtonStyle: ButtonStyle {
 struct TempoSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
+            .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(TempoColor.ink)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(TempoColor.surfaceStrong)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.vertical, 15)
+            .background(TempoColor.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(TempoColor.line, lineWidth: 1)
             )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .opacity(configuration.isPressed ? 0.94 : 1)
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .opacity(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }

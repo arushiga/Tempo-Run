@@ -36,19 +36,39 @@ class AuthViewModel: ObservableObject {
       }
 
     func signIn(email: String, password: String) async {
+      isLoading = true
+      errorMessage = nil
+      do {
+        let result = try await Auth.auth().signIn(withEmail: email, password: password)
+        self.user = result.user
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+      isLoading = false
+    }
+  
+    func resetPassword(email: String) async {
         isLoading = true
         errorMessage = nil
         do {
-            let result = try await Auth.auth().signIn(withEmail: email, password: password)
-            self.user = result.user
+            try await Auth.auth().sendPasswordReset(withEmail: email)
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
-    func signOut() {
+
+    func signOut(store: AppDataStore) {
         try? Auth.auth().signOut()
         self.user = nil
+        store.clearUserData()
+    }
+
+    private func clearLocalCache() {
+        let keys = UserDefaults.standard.dictionaryRepresentation().keys
+        keys.filter { $0.hasPrefix("tempo_") }.forEach {
+            UserDefaults.standard.removeObject(forKey: $0)
+        }
     }
 }

@@ -9,17 +9,17 @@ struct GlassCard<Content: View>: View {
 
     var body: some View {
         content
-            .padding(20)
+            .padding(22)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .fill(TempoColor.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .stroke(TempoColor.line, lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.06), radius: 18, y: 8)
+            .shadow(color: Color.black.opacity(0.035), radius: 10, y: 2)
     }
 }
 

@@ -6,13 +6,15 @@ struct LoginView: View {
     @State private var password = ""
     @State private var rememberMe = true
     @State private var showsPassword = false
+    @State private var resetEmailSent = false
+
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 header
                 formCard
-                footer
+//                footer
             }
             .padding(20)
         }
@@ -80,9 +82,21 @@ struct LoginView: View {
                     Spacer()
 
                     Button("Forgot Password?") {
+                      Task {
+                              await auth.resetPassword(email: email)
+                              if auth.errorMessage == nil {
+                                  resetEmailSent = true
+                              }
+                          }
                     }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(TempoColor.primary)
+                }
+                
+                if resetEmailSent {
+                    Text("Password reset email sent — check your inbox.")
+                        .font(.caption)
+                        .foregroundStyle(TempoColor.secondary)
                 }
 
                 Button("Sign In") {
@@ -101,15 +115,15 @@ struct LoginView: View {
               
                 Divider()
 
-                Text("or continue with")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(TempoColor.slate)
-                    .frame(maxWidth: .infinity)
-
-                HStack(spacing: 12) {
-                    socialButton(title: "Google", icon: "globe")
-                    socialButton(title: "Apple", icon: "apple.logo")
-                }
+//                Text("or continue with")
+//                    .font(.subheadline.weight(.medium))
+//                    .foregroundStyle(TempoColor.slate)
+//                    .frame(maxWidth: .infinity)
+//
+//                HStack(spacing: 12) {
+//                    socialButton(title: "Google", icon: "globe")
+//                    socialButton(title: "Apple", icon: "apple.logo")
+//                }
 
                 HStack(spacing: 4) {
                     Text("Don't have an account?")
@@ -128,12 +142,12 @@ struct LoginView: View {
         }
     }
 
-    private var footer: some View {
-        Text("Prototype only: Firebase Auth wiring comes next.")
-            .font(.caption)
-            .foregroundStyle(TempoColor.slate)
-            .padding(.bottom, 12)
-    }
+//    private var footer: some View {
+//        Text("Prototype only: Firebase Auth wiring comes next.")
+//            .font(.caption)
+//            .foregroundStyle(TempoColor.slate)
+//            .padding(.bottom, 12)
+//    }
 
     private func socialButton(title: String, icon: String) -> some View {
         Button {

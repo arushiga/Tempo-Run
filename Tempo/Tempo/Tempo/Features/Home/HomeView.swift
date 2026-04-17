@@ -1,105 +1,95 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Environment(AppDataStore.self) private var store
+
+    private var weekStart: String { AppDataStore.currentWeekStart() }
+    private var weekActs: [Activity] { store.weekActivities(weekStart) }
+    private var weekMiles: Double { store.totalMiles(weekActs) }
+    private var weekRuns: Int { weekActs.count }
+    private var weekSecs: Int { weekActs.reduce(0) { $0 + $1.durationSeconds } }
+    private var weekAvgPace: String {
+        let s = store.avgPaceSeconds(weekActs)
+        return s > 0 ? store.formatPace(s) : "--:--"
+    }
+    private var totalAllMiles: Double { store.totalMiles(store.activities) }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                hero
-                prototypeStatus
-                quickLinks
+                heroCard
+                weekStatsSection
+                goalsSection
+                recentRunCard
             }
-            .padding(20)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
         }
         .background(TempoGradient.appBackground.ignoresSafeArea())
         .navigationTitle("Tempo")
     }
 
-    private var hero: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Tempo")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-
-            Text("Native SwiftUI shell for the running planner prototype.")
+    private var heroCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Dashboard")
+                .font(.system(size: 32, weight: .semibold))
+                .foregroundStyle(TempoColor.ink)
+            Text("Week of \(AppDataStore.formatDisplayDate(weekStart))")
                 .font(.headline)
-                .foregroundStyle(.white.opacity(0.9))
-
-            Text("This home screen is the launch point for the Assignment 5 prototypes.")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.82))
+                .foregroundStyle(TempoColor.slate)
         }
-        .foregroundStyle(.white)
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(TempoGradient.hero)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(TempoColor.surface)
         )
-        .shadow(color: TempoColor.primary.opacity(0.24), radius: 18, y: 10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(TempoColor.line, lineWidth: 1)
+        )
     }
 
-    private var prototypeStatus: some View {
+    private var weekStatsSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Prototype Status")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(TempoColor.ink)
-
-                statusRow(title: "Hello World", value: "Complete")
-                statusRow(title: "Hello Styles", value: "Complete")
-                statusRow(title: "Planner", value: "Scaffolded")
-                statusRow(title: "Profile", value: "Scaffolded")
-                statusRow(title: "Auth + Firebase", value: "Complete")
+                Text("This Week").font(.title3.weight(.semibold)).foregroundStyle(TempoColor.ink)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    StatCard(icon: "figure.run",  value: "\(weekRuns)",                          label: "Runs",     color: TempoColor.primary)
+                    StatCard(icon: "map",          value: String(format: "%.1f mi", weekMiles),   label: "Distance", color: TempoColor.secondary)
+                    StatCard(icon: "clock",        value: store.formatDuration(weekSecs),          label: "Time",     color: TempoColor.accent)
+                    StatCard(icon: "speedometer",  value: "\(weekAvgPace)/mi",                    label: "Avg Pace", color: TempoColor.warmAccent)
+                }
             }
         }
     }
 
-    private var quickLinks: some View {
+    private var goalsSection: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Demo Screens")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(TempoColor.ink)
-
-                NavigationLink {
-                    HelloWorldView()
-                } label: {
-                    Label("Open Hello World", systemImage: "hand.wave")
-                }
-                .buttonStyle(TempoPrimaryButtonStyle())
-
-                NavigationLink {
-                    HelloStylesView()
-                } label: {
-                    Label("Open Hello Styles", systemImage: "paintpalette")
-                }
-                .buttonStyle(TempoSecondaryButtonStyle())
-
-                NavigationLink {
-                    LoginView()
-                } label: {
-                    Label("Open Login Prototype", systemImage: "person.crop.circle")
-                }
-                .buttonStyle(TempoSecondaryButtonStyle())
+                Text("Current Goals").font(.title3.weight(.semibold)).foregroundStyle(TempoColor.ink)
+                GoalProgressRow(label: "Weekly Distance", current: weekMiles,       goal: 25,  unit: "mi",   color: TempoColor.primary)
+                GoalProgressRow(label: "Runs This Week",  current: Double(weekRuns), goal: 5,   unit: "runs", color: TempoColor.secondary)
+                GoalProgressRow(label: "All-Time Miles",  current: totalAllMiles,    goal: 500, unit: "mi",   color: TempoColor.accent)
             }
         }
     }
 
-    private func statusRow(title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(TempoColor.ink)
-
-            Spacer()
-
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(TempoColor.primary)
+    private var recentRunCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Most Recent Run").font(.title3.weight(.semibold)).foregroundStyle(TempoColor.ink)
+                if let recent = store.mostRecentActivity() {
+                    ActivityRowView(activity: recent, store: store)
+                } else {
+                    Label("No runs logged yet.", systemImage: "figure.run.circle")
+                        .font(.subheadline).foregroundStyle(TempoColor.slate)
+                }
+            }
         }
     }
 }
 
 #Preview {
-    NavigationStack {
-        HomeView()
-    }
+    NavigationStack { HomeView() }
 }
