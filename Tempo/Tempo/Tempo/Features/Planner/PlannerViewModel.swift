@@ -8,10 +8,7 @@ final class PlannerViewModel {
     var currentWeekStart: String = AppDataStore.currentWeekStart()
     var expandedDays: Set<Int> = []
 
-    var scheduledRuns: [ScheduledRun] = [
-        ScheduledRun(type: .easy, day: 0, timeOfDay: .am),
-        ScheduledRun(type: .tempo, day: 1, timeOfDay: .pm),
-    ]
+    var scheduledRuns: [ScheduledRun] = []
 
     // MARK: - Drag-and-drop (unchanged)
 

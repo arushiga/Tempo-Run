@@ -115,11 +115,6 @@ struct SignUpView: View {
 
                 Divider()
 
-                HStack(spacing: 12) {
-                    socialButton(title: "Google", icon: "globe")
-                    socialButton(title: "Apple", icon: "apple.logo")
-                }
-
                 HStack(spacing: 4) {
                     Text("Already have an account?")
                         .foregroundStyle(TempoColor.slate)

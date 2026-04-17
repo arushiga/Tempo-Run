@@ -121,9 +121,9 @@ final class AppDataStore {
                     let idStr = dict["id"] as? String, let id = UUID(uuidString: idStr),
                     let typeStr = dict["type"] as? String, let type_ = RunType(rawValue: typeStr),
                     let day = dict["day"] as? Int,
-                    let todStr = dict["timeOfDay"] as? String, let tod = TimeOfDay(rawValue: todStr),
-                    let miles = dict["distanceMiles"] as? Double
+                    let todStr = dict["timeOfDay"] as? String, let tod = TimeOfDay(rawValue: todStr)
                 else { return nil }
+                let miles = (dict["distanceMiles"] as? Double) ?? Double(dict["distanceMiles"] as? Int ?? 0)
                 return ScheduledRun(id: id, type: type_, day: day, timeOfDay: tod, distanceMiles: miles)
             }
         } catch {
