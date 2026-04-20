@@ -17,21 +17,21 @@ struct StatCard: View {
                     .foregroundStyle(color)
             }
             Text(value)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 23, weight: .bold))
                 .foregroundStyle(TempoColor.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
-                .font(.caption)
-                .foregroundStyle(TempoColor.muted)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(TempoColor.slate)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(TempoColor.surface)
+        .background(TempoColor.infoTile)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(TempoColor.line, lineWidth: 1)
+                .stroke(TempoColor.lineStrong.opacity(0.75), lineWidth: 1)
         )
     }
 }

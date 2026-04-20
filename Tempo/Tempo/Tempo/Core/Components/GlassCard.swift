@@ -17,9 +17,9 @@ struct GlassCard<Content: View>: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(TempoColor.line, lineWidth: 1)
+                    .stroke(TempoColor.lineStrong.opacity(0.75), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.035), radius: 10, y: 2)
+            .shadow(color: Color.black.opacity(0.045), radius: 12, y: 3)
     }
 }
 

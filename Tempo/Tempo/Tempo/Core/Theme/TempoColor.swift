@@ -9,10 +9,11 @@ enum TempoColor {
     static let accent = Color(red: 0.84, green: 0.88, blue: 0.97)
     static let warmAccent = Color(red: 0.66, green: 0.72, blue: 0.84)
     static let surface = Color.white
-    static let surfaceStrong = Color(red: 0.98, green: 0.99, blue: 1.0)
-    static let surfaceMuted = Color(red: 0.96, green: 0.97, blue: 0.99)
-    static let line = Color(red: 0.89, green: 0.91, blue: 0.95)
-    static let lineStrong = Color(red: 0.83, green: 0.86, blue: 0.91)
-    static let backgroundTop = Color(red: 0.97, green: 0.98, blue: 0.99)
-    static let backgroundBottom = Color(red: 0.95, green: 0.96, blue: 0.98)
+    static let surfaceStrong = Color(red: 0.97, green: 0.98, blue: 1.0)
+    static let surfaceMuted = Color(red: 0.93, green: 0.95, blue: 0.99)
+    static let infoTile = Color(red: 0.91, green: 0.95, blue: 1.0)
+    static let line = Color(red: 0.84, green: 0.87, blue: 0.93)
+    static let lineStrong = Color(red: 0.73, green: 0.78, blue: 0.86)
+    static let backgroundTop = Color(red: 0.93, green: 0.95, blue: 0.98)
+    static let backgroundBottom = Color(red: 0.90, green: 0.93, blue: 0.97)
 }

@@ -70,8 +70,12 @@ struct PlannerStatsView: View {
                     .frame(height: 180)
                 }
                 .padding(18)
-                .background(.white.opacity(0.55))
+                .background(TempoColor.infoTile)
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(TempoColor.line, lineWidth: 1)
+                )
             }
         }
         .alert(activeExplanation?.title ?? "", isPresented: Binding(
@@ -151,8 +155,12 @@ private struct WeeklyCompletionCard: View {
             }
         }
         .padding(18)
-        .background(TempoColor.primary.opacity(0.08))
+        .background(TempoColor.infoTile)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(TempoColor.line, lineWidth: 1)
+        )
     }
 
     private func completionMetric(title: String, value: String) -> some View {
@@ -207,8 +215,12 @@ private struct PlannerMetricRow: View {
                 .tint(tint)
         }
         .padding(16)
-        .background(.white.opacity(0.55))
+        .background(TempoColor.infoTile)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(TempoColor.line, lineWidth: 1)
+        )
     }
 
     private func formatted(_ value: Int) -> String {
