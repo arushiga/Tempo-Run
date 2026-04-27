@@ -4,15 +4,24 @@ struct RunTypePickerView: View {
     var body: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 18) {
-                Text("Run Types")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(TempoColor.ink)
+                HStack(spacing: 8) {
+                    Text("Run Types")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(TempoColor.ink)
+                    Image(systemName: "hand.draw")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TempoColor.primary)
+                }
 
                 HStack(spacing: 16) {
                     ForEach(RunType.allCases) { runType in
                         PlannerRunTypeToken(runType: runType)
                     }
                 }
+
+                Text("Drag and drop — long hold the icons")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TempoColor.slate)
             }
         }
     }
@@ -29,13 +38,14 @@ private struct PlannerRunTypeToken: View {
                 .frame(width: 58, height: 58)
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(TempoColor.line, lineWidth: 1)
+                        .stroke(TempoColor.lineStrong.opacity(0.95), lineWidth: 1.5)
                 }
                 .overlay {
                     Image(systemName: runType.symbolName)
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(runType.color)
                 }
+                .shadow(color: TempoColor.ink.opacity(0.04), radius: 6, y: 2)
                 .scaleEffect(isDragging ? 0.92 : 1)
                 .opacity(isDragging ? 0.65 : 1)
 

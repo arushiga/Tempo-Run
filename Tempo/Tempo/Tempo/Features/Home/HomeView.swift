@@ -17,12 +17,14 @@ struct HomeView: View {
     private var weeklyMileageGoal: Double { store.profile.weeklyMileageGoal }
     private var weeklyRunGoal: Int { store.profile.weeklyRunGoal }
     private var allTimeMileGoal: Double { store.profile.allTimeMileGoal }
+    private var trends: HistoricalTrendComparison { store.historicalTrendComparison(for: weekStart) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 heroCard
                 weekStatsSection
+                trendComparisonSection
                 goalsSection
                 recentRunCard
             }
@@ -45,6 +47,9 @@ struct HomeView: View {
             Text("Week of \(AppDataStore.formatDisplayDate(weekStart))")
                 .font(.headline)
                 .foregroundStyle(TempoColor.slate)
+            Text("Turn past runs into smarter weekly training plans.")
+                .font(.subheadline)
+                .foregroundStyle(TempoColor.muted)
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -66,7 +71,7 @@ struct HomeView: View {
                     StatCard(icon: "figure.run",  value: "\(weekRuns)",                          label: "Runs",     color: TempoColor.primary)
                     StatCard(icon: "map",          value: String(format: "%.1f mi", weekMiles),   label: "Distance", color: TempoColor.secondary)
                     StatCard(icon: "clock",        value: store.formatDuration(weekSecs),          label: "Time",     color: TempoColor.ink)
-                    StatCard(icon: "speedometer",  value: "\(weekAvgPace)/mi",                    label: "Avg Pace", color: TempoColor.warmAccent)
+                    StatCard(icon: "gauge.medium", value: "\(weekAvgPace)/mi",                    label: "Avg Pace", color: TempoColor.primary)
                 }
             }
         }
@@ -89,7 +94,44 @@ struct HomeView: View {
                 }
                 GoalProgressRow(label: "Weekly Distance", current: weekMiles,        goal: weeklyMileageGoal,      unit: "mi",   color: TempoColor.primary)
                 GoalProgressRow(label: "Runs This Week",  current: Double(weekRuns), goal: Double(weeklyRunGoal), unit: "runs", color: TempoColor.secondary)
-                GoalProgressRow(label: "All-Time Miles",  current: totalAllMiles,    goal: allTimeMileGoal,       unit: "mi",   color: TempoColor.accent)
+                GoalProgressRow(label: "All-Time Miles",  current: totalAllMiles,    goal: allTimeMileGoal,       unit: "mi",   color: TempoColor.ink)
+            }
+        }
+    }
+
+    private var trendComparisonSection: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Historical Trends")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(TempoColor.ink)
+
+                trendRow(
+                    title: "Mileage",
+                    current: String(format: "%.1f mi", trends.currentMiles),
+                    previous: String(format: "%.1f mi", trends.previousMiles),
+                    average: String(format: "%.1f mi", trends.fourWeekAverageMiles),
+                    icon: "chart.bar.fill",
+                    color: TempoColor.primary
+                )
+
+                trendRow(
+                    title: "Runs",
+                    current: "\(trends.currentRuns)",
+                    previous: "\(trends.previousRuns)",
+                    average: String(format: "%.1f", trends.fourWeekAverageRuns),
+                    icon: "figure.run",
+                    color: TempoColor.secondary
+                )
+
+                trendRow(
+                    title: "Pace",
+                    current: trendPaceText(trends.currentPaceSeconds),
+                    previous: trendPaceText(trends.previousPaceSeconds),
+                    average: trendPaceText(trends.fourWeekAveragePaceSeconds),
+                    icon: "gauge.medium",
+                    color: TempoColor.ink
+                )
             }
         }
     }
@@ -106,6 +148,70 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    private func trendRow(
+        title: String,
+        current: String,
+        previous: String,
+        average: String,
+        icon: String,
+        color: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(color.opacity(0.12))
+                    .frame(width: 34, height: 34)
+                    .overlay {
+                        Image(systemName: icon)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(color)
+                    }
+
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(TempoColor.ink)
+            }
+
+            HStack(spacing: 12) {
+                trendValueCard(label: "This Week", value: current, emphasisColor: TempoColor.primary)
+                trendValueCard(label: "Last Week", value: previous, emphasisColor: TempoColor.secondary)
+                trendValueCard(label: "4-Week Avg", value: average, centerContent: true)
+            }
+        }
+    }
+
+    private func trendValueCard(
+        label: String,
+        value: String,
+        emphasisColor: Color? = nil,
+        centerContent: Bool = false
+    ) -> some View {
+        VStack(alignment: centerContent ? .center : .leading, spacing: 4) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(TempoColor.slate)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .multilineTextAlignment(centerContent ? .center : .leading)
+            Text(value)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(emphasisColor ?? TempoColor.ink)
+                .multilineTextAlignment(centerContent ? .center : .leading)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 74, maxHeight: 74, alignment: centerContent ? .center : .leading)
+        .background(TempoColor.infoTile)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(TempoColor.line, lineWidth: 1)
+        )
+    }
+
+    private func trendPaceText(_ seconds: Int) -> String {
+        seconds > 0 ? "\(store.formatPace(seconds))/mi" : "--:--"
     }
 }
 

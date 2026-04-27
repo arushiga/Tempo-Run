@@ -62,21 +62,158 @@ private struct DayView: View {
     let store: AppDataStore
     private var todayISO: String { AppDataStore.dateToISO(Date()) }
     private var todayActs: [Activity] { store.activities.filter { $0.completionDate == todayISO } }
+    private var totalTodayMiles: Double { store.totalMiles(todayActs) }
+    private var totalTodaySeconds: Int { todayActs.reduce(0) { $0 + $1.durationSeconds } }
+    private var averageTodayPace: String {
+        let pace = store.avgPaceSeconds(todayActs)
+        return pace > 0 ? store.formatPace(pace) : "--:--"
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            GlassCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Today — \(AppDataStore.formatDisplayDate(todayISO))")
+                        .font(.title3.weight(.semibold)).foregroundStyle(TempoColor.ink)
+
+                    if todayActs.isEmpty {
+                        emptyState("No runs logged today.")
+                    } else {
+                        HStack(spacing: 16) {
+                            dayMetric("Runs", "\(todayActs.count)")
+                            dayMetric("Miles", String(format: "%.1f", totalTodayMiles))
+                            dayMetric("Avg Pace", averageTodayPace)
+                            dayMetric("Time", store.formatDuration(totalTodaySeconds))
+                        }
+                    }
+                }
+            }
+
+            if !todayActs.isEmpty {
+                ForEach(todayActs) { activity in
+                    DayActivityCard(activity: activity, store: store)
+                }
+            }
+        }
+    }
+
+    private func dayMetric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(TempoColor.ink)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(TempoColor.slate)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct DayActivityCard: View {
+    let activity: Activity
+    let store: AppDataStore
+    @State private var showingDetails = false
 
     var body: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Today — \(AppDataStore.formatDisplayDate(todayISO))")
-                    .font(.title3.weight(.semibold)).foregroundStyle(TempoColor.ink)
-                if todayActs.isEmpty {
-                    emptyState("No runs logged today.")
-                } else {
-                    ForEach(todayActs) { a in
-                        ActivityRowView(activity: a, store: store)
-                        if a.id != todayActs.last?.id { Divider() }
+                HStack(alignment: .top, spacing: 12) {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(activity.category.color.opacity(0.14))
+                        .frame(width: 48, height: 48)
+                        .overlay {
+                            Image(systemName: iconName(for: activity.category))
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(activity.category.color)
+                        }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(activity.name)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(TempoColor.ink)
+                        Text(AppDataStore.formatDisplayDate(activity.completionDate))
+                            .font(.caption)
+                            .foregroundStyle(TempoColor.slate)
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        Text(activity.category.label)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(activity.category.color)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(activity.category.color.opacity(0.12))
+                            .clipShape(Capsule())
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(TempoColor.slate)
                     }
                 }
+
+                HStack(spacing: 12) {
+                    detailPill(icon: "map", value: String(format: "%.1f mi", activity.distanceMiles))
+                    detailPill(icon: "clock", value: store.formatDuration(activity.durationSeconds))
+                    detailPill(icon: "speedometer", value: "\(store.formatPace(activity.avgPaceSecondsPerMile))/mi")
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Run Summary")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TempoColor.slate)
+                    Text(summaryText)
+                        .font(.subheadline)
+                        .foregroundStyle(TempoColor.ink)
+                }
             }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showingDetails = true
+        }
+        .sheet(isPresented: $showingDetails) {
+            ActivityDetailSheet(activity: activity, store: store)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var summaryText: String {
+        "Completed a \(activity.category.label.lowercased()) effort covering \(String(format: "%.1f", activity.distanceMiles)) miles in \(store.formatDuration(activity.durationSeconds))."
+    }
+
+    private func detailPill(icon: String, value: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+            Text(value)
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(TempoColor.ink)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(TempoColor.infoTile)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(TempoColor.line, lineWidth: 1)
+        )
+    }
+
+    private func iconName(for category: RunCategory) -> String {
+        switch category {
+        case .easy:
+            "figure.run"
+        case .tempo:
+            "bolt.fill"
+        case .long:
+            "road.lanes"
+        case .race:
+            "flag.checkered"
         }
     }
 }

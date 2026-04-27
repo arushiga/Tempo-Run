@@ -9,6 +9,8 @@ struct Activity: Identifiable, Codable {
     var durationSeconds: Int
     var avgPaceSecondsPerMile: Int
     var category: RunCategory
+    var notes: String
+    var linkedPlannedRunID: String?
 
     init(
         id: String = UUID().uuidString,
@@ -17,7 +19,9 @@ struct Activity: Identifiable, Codable {
         uploadDate: String,
         distanceMiles: Double,
         durationSeconds: Int,
-        category: RunCategory
+        category: RunCategory,
+        notes: String = "",
+        linkedPlannedRunID: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -29,6 +33,8 @@ struct Activity: Identifiable, Codable {
             ? Int(Double(durationSeconds) / distanceMiles)
             : 0
         self.category = category
+        self.notes = notes
+        self.linkedPlannedRunID = linkedPlannedRunID
     }
 }
 

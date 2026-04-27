@@ -4,6 +4,7 @@ import FirebaseAuth
 struct ProfileView: View {
     @EnvironmentObject var auth: AuthViewModel
     @Environment(AppDataStore.self) private var store
+    @State private var showingPlannerReviewSummary = false
 
     private var allActs: [Activity] { store.activities }
     private var totalRuns: Int { allActs.count }
@@ -131,9 +132,26 @@ struct ProfileView: View {
     private var weeklyPlannerReviewCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Weekly Planner Review")
-                    .font(.title3.weight(.semibold))
+                Button {
+                    showingPlannerReviewSummary = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Weekly Planner Review")
+                            .font(.title3.weight(.semibold))
+                        Image(systemName: "info.circle")
+                            .font(.subheadline.weight(.semibold))
+                    }
                     .foregroundStyle(TempoColor.ink)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(TempoColor.infoTile)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(TempoColor.line, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
 
                 HStack(spacing: 12) {
                     plannerReviewStat("Plan Load", "\(weeklyReview.plannedLoad)")
@@ -176,6 +194,11 @@ struct ProfileView: View {
                 }
             }
         }
+        .alert("Weekly Planner Review", isPresented: $showingPlannerReviewSummary) {
+            Button("Done", role: .cancel) {}
+        } message: {
+            Text("Planned load is \(weeklyReview.plannedLoad), planned intensity is \(weeklyReview.plannedIntensity), and \(weeklyReview.completedPlannedRunCount) of \(weeklyReview.plannedRunCount) planned runs are currently matched as completed this week.")
+        }
     }
 
     private func plannerReviewStat(_ label: String, _ value: String) -> some View {
@@ -201,10 +224,10 @@ struct ProfileView: View {
                              label: "Total Runs",   color: TempoColor.primary)
                     StatCard(icon: "map",           value: String(format: "%.1f mi", totalMiles),
                              label: "Total Miles",  color: TempoColor.secondary)
-                    StatCard(icon: "clock",         value: store.formatDuration(totalSecs),
-                             label: "Total Time",   color: TempoColor.accent)
-                    StatCard(icon: "speedometer",   value: "\(allTimeAvgPace)/mi",
-                             label: "Avg Pace",     color: TempoColor.warmAccent)
+                    StatCard(icon: "stopwatch",     value: store.formatDuration(totalSecs),
+                             label: "Total Time",   color: TempoColor.ink)
+                    StatCard(icon: "gauge.medium",  value: "\(allTimeAvgPace)/mi",
+                             label: "Avg Pace",     color: TempoColor.primary)
                 }
             }
         }

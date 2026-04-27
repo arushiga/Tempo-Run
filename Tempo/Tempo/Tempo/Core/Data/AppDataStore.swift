@@ -38,6 +38,18 @@ struct WeeklyStats: Codable {
     var avgPaceSeconds: Int
 }
 
+struct HistoricalTrendComparison {
+    let currentMiles: Double
+    let previousMiles: Double
+    let fourWeekAverageMiles: Double
+    let currentRuns: Int
+    let previousRuns: Int
+    let fourWeekAverageRuns: Double
+    let currentPaceSeconds: Int
+    let previousPaceSeconds: Int
+    let fourWeekAveragePaceSeconds: Int
+}
+
 struct UserProfile: Codable {
     var fullName: String
     var email: String
@@ -117,6 +129,43 @@ final class AppDataStore {
         }
     }
 
+    func updateActivity(_ activity: Activity) {
+        guard let existing = activities.first(where: { $0.id == activity.id }) else {
+            addActivity(activity)
+            return
+        }
+
+        var updated = activities
+        if let index = updated.firstIndex(where: { $0.id == activity.id }) {
+            updated[index] = activity
+        }
+        updated.sort { $0.completionDate > $1.completionDate }
+        activities = updated
+        cacheActivities(updated, for: currentUserID)
+        saveActivity(activity)
+
+        let impactedWeeks = Set([
+            Self.weekStart(forISODate: existing.completionDate),
+            Self.weekStart(forISODate: activity.completionDate),
+        ].compactMap { $0 })
+
+        for weekStart in impactedWeeks {
+            saveWeeklyStats(weekStart: weekStart)
+        }
+    }
+
+    func deleteActivity(id: String) {
+        guard let existing = activities.first(where: { $0.id == id }) else { return }
+
+        activities.removeAll { $0.id == id }
+        cacheActivities(activities, for: currentUserID)
+        deleteActivityFromFirebase(id: id)
+
+        if let weekStart = Self.weekStart(forISODate: existing.completionDate) {
+            saveWeeklyStats(weekStart: weekStart)
+        }
+    }
+
     func loadActivitiesFromFirebase() async {
         guard let uid = currentUserID else {
             loadCachedActivities(for: nil)
@@ -150,6 +199,18 @@ final class AppDataStore {
             }
     }
 
+    private func deleteActivityFromFirebase(id: String) {
+        guard let uid = currentUserID else { return }
+
+        db.collection("users").document(uid)
+            .collection("activities").document(id)
+            .delete { error in
+                if let error {
+                    print("Failed to delete activity: \(error)")
+                }
+            }
+    }
+
     private func loadCachedActivities(for userID: String?) {
         guard let data = UserDefaults.standard.data(forKey: activitiesKey(for: userID)),
               let decoded = try? JSONDecoder().decode([Activity].self, from: data) else {
@@ -165,7 +226,7 @@ final class AppDataStore {
     }
 
     private func activityDocumentData(for activity: Activity) -> [String: Any] {
-        [
+        var data: [String: Any] = [
             "id": activity.id,
             "name": activity.name,
             "completionDate": timestamp(fromISO: activity.completionDate),
@@ -174,7 +235,10 @@ final class AppDataStore {
             "durationSeconds": activity.durationSeconds,
             "avgPaceSecondsPerMile": activity.avgPaceSecondsPerMile,
             "category": activity.category.rawValue,
+            "notes": activity.notes,
         ]
+        data["linkedPlannedRunID"] = activity.linkedPlannedRunID ?? NSNull()
+        return data
     }
 
     private func makeActivity(from document: QueryDocumentSnapshot) -> Activity? {
@@ -196,7 +260,9 @@ final class AppDataStore {
             uploadDate: uploadDate,
             distanceMiles: doubleValue(from: data["distanceMiles"]),
             durationSeconds: intValue(from: data["durationSeconds"]),
-            category: category
+            category: category,
+            notes: (data["notes"] as? String) ?? "",
+            linkedPlannedRunID: data["linkedPlannedRunID"] as? String
         )
     }
 
@@ -340,6 +406,48 @@ final class AppDataStore {
 
     func mostRecentActivity() -> Activity? {
         activities.max(by: { $0.completionDate < $1.completionDate })
+    }
+
+    func linkedPlannedRun(for activity: Activity) -> ScheduledRun? {
+        guard
+            let linkedPlannedRunID = activity.linkedPlannedRunID,
+            let weekStart = Self.weekStart(forISODate: activity.completionDate)
+        else {
+            return nil
+        }
+
+        return cachedWeekPlan(weekStart).first { $0.id.uuidString == linkedPlannedRunID }
+    }
+
+    func historicalTrendComparison(for weekStart: String) -> HistoricalTrendComparison {
+        let currentActivities = weekActivities(weekStart)
+        let previousWeekStart = Self.shiftWeek(weekStart, by: -1)
+        let previousActivities = weekActivities(previousWeekStart)
+
+        let trailingWeeks = (1...4).map { offset in
+            weekActivities(Self.shiftWeek(weekStart, by: -offset))
+        }
+
+        let trailingMilesTotal = trailingWeeks.reduce(0.0) { $0 + totalMiles($1) }
+        let trailingRunsTotal = trailingWeeks.reduce(0) { $0 + $1.count }
+        let trailingSecondsTotal = trailingWeeks.reduce(0) { partialResult, week in
+            partialResult + week.reduce(0) { $0 + $1.durationSeconds }
+        }
+        let trailingWeekCount = Double(max(trailingWeeks.count, 1))
+
+        return HistoricalTrendComparison(
+            currentMiles: totalMiles(currentActivities),
+            previousMiles: totalMiles(previousActivities),
+            fourWeekAverageMiles: trailingMilesTotal / trailingWeekCount,
+            currentRuns: currentActivities.count,
+            previousRuns: previousActivities.count,
+            fourWeekAverageRuns: Double(trailingRunsTotal) / trailingWeekCount,
+            currentPaceSeconds: avgPaceSeconds(currentActivities),
+            previousPaceSeconds: avgPaceSeconds(previousActivities),
+            fourWeekAveragePaceSeconds: trailingMilesTotal > 0
+                ? Int(round(Double(trailingSecondsTotal) / trailingMilesTotal))
+                : 0
+        )
     }
 
     func weeklyReview(weekStart: String, plannedRuns: [ScheduledRun]? = nil) -> WeeklyReview {
@@ -641,9 +749,14 @@ final class AppDataStore {
         var matches: [Activity] = []
 
         for run in plannedRuns {
-            guard let index = remaining.firstIndex(where: { activity in
-                activity.category.matches(run.type)
-            }) else { continue }
+            let explicitIndex = remaining.firstIndex { activity in
+                activity.linkedPlannedRunID == run.id.uuidString
+            }
+            let fallbackIndex = remaining.firstIndex { activity in
+                activity.linkedPlannedRunID == nil && activity.category.matches(run.type)
+            }
+
+            guard let index = explicitIndex ?? fallbackIndex else { continue }
             matches.append(remaining.remove(at: index))
         }
 

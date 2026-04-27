@@ -53,10 +53,13 @@ struct PlannerGridView: View {
             Spacer().frame(width: 16)
             ForEach(Array(viewModel.dayLabels.enumerated()), id: \.offset) { index, label in
                 Button { viewModel.toggleDay(index) } label: {
-                    VStack(spacing: 2) {
+                    VStack(spacing: 1) {
                         Text(label)
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(TempoColor.ink)
+                        Text(dayOfMonthLabel(for: index))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(TempoColor.slate)
                         Image(systemName: viewModel.expandedDays.contains(index) ? "chevron.up" : "chevron.down")
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(!viewModel.runsForDay(index).isEmpty ? TempoColor.primary : Color.clear)
@@ -173,6 +176,10 @@ struct PlannerCellView: View {
         )
         .scaleEffect(isTargeted ? 1.08 : 1)
         .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isTargeted)
+        .onTapGesture {
+            guard let scheduledRun, focusedField.wrappedValue == nil else { return }
+            viewModel.removeRun(id: scheduledRun.id)
+        }
         .dropDestination(for: PlannerDragItem.self) { items, _ in
             guard let item = items.first else { return false }
             switch item {
@@ -328,6 +335,17 @@ private extension PlannerGridView {
         for key in draftMiles.keys where key.runID == runID {
             draftMiles[key] = formatted
         }
+    }
+
+    func dayOfMonthLabel(for dayIndex: Int) -> String {
+        guard let weekStartDate = AppDataStore.isoToDate(viewModel.currentWeekStart) else {
+            return "--"
+        }
+        let date = weekStartDate.addingTimeInterval(Double(dayIndex) * 86400)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter.string(from: date)
     }
 }
 

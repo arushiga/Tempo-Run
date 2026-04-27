@@ -31,26 +31,15 @@ struct PlannerStatsView: View {
 
                 WeeklyCompletionCard(review: review)
 
-                PlannerMetricRow(
-                    title: "Relative Load",
-                    value: review.plannedRelativeLoad,
-                    comparisonValue: review.actualRelativeLoad,
-                    tint: relativeLoadTint(review.plannedRelativeLoad),
-                    explanationAction: { activeExplanation = .relativeLoad }
-                )
-
-                PlannerMetricRow(
-                    title: "Training Intensity",
-                    value: review.plannedIntensity,
-                    comparisonValue: review.actualIntensity,
-                    tint: TempoColor.secondary,
-                    explanationAction: { activeExplanation = .trainingIntensity }
-                )
-
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Planned vs Actual Mileage")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(TempoColor.ink)
+
+                    HStack(spacing: 14) {
+                        mileageLegendItem(label: "Planned", color: TempoColor.primary.opacity(0.35))
+                        mileageLegendItem(label: "Actual", color: TempoColor.secondary)
+                    }
 
                     Chart(mileagePoints) { point in
                         BarMark(
@@ -76,6 +65,22 @@ struct PlannerStatsView: View {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .stroke(TempoColor.line, lineWidth: 1)
                 )
+
+                PlannerMetricRow(
+                    title: "Relative Load",
+                    value: review.plannedRelativeLoad,
+                    comparisonValue: review.actualRelativeLoad,
+                    tint: relativeLoadTint(review.plannedRelativeLoad),
+                    explanationAction: { activeExplanation = .relativeLoad }
+                )
+
+                PlannerMetricRow(
+                    title: "Training Intensity",
+                    value: review.plannedIntensity,
+                    comparisonValue: review.actualIntensity,
+                    tint: TempoColor.secondary,
+                    explanationAction: { activeExplanation = .trainingIntensity }
+                )
             }
         }
         .alert(activeExplanation?.title ?? "", isPresented: Binding(
@@ -100,6 +105,17 @@ struct PlannerStatsView: View {
             TempoColor.warmAccent
         default:
             Color.red
+        }
+    }
+
+    private func mileageLegendItem(label: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(TempoColor.slate)
         }
     }
 }
@@ -206,7 +222,7 @@ private struct PlannerMetricRow: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("Plan \(formatted(value))")
                         .font(.headline.weight(.bold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(title == "Relative Load" ? TempoColor.primary : tint)
                     Text("Actual \(formatted(comparisonValue))")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(TempoColor.slate)
