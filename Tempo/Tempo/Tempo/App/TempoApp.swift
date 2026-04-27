@@ -8,6 +8,7 @@
 
 import SwiftUI
 import FirebaseCore
+import FirebaseAuth
 
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -26,21 +27,21 @@ struct TempoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if auth.user != nil {
-              AppShellView()
-                      .environmentObject(auth)
-                      .environment(store)
-                      .onChange(of: auth.user) { _, newUser in
-                          if newUser != nil {
-                              Task { await store.loadActivitiesFromFirebase() }
-                          }
-                      }
-            } else {
-                NavigationStack {
-                    LoginView()
+            Group {
+                if auth.user != nil {
+                    AppShellView()
+                        .environmentObject(auth)
+                        .environment(store)
+                } else {
+                    NavigationStack {
+                        LoginView()
+                    }
+                    .environmentObject(auth)
+                    .environment(store)
                 }
-                .environmentObject(auth)
-                .environment(store)
+            }
+            .task(id: auth.user?.uid) {
+                await store.bootstrapForCurrentUser()
             }
         }
     }

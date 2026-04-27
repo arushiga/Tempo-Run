@@ -1,7 +1,7 @@
 import Foundation
 import Observation
-import FirebaseFirestore
 import FirebaseAuth
+import FirebaseFirestore
 
 struct DailyMileagePoint: Identifiable {
     let id: Int
@@ -49,86 +49,245 @@ struct UserProfile: Codable {
 @Observable
 final class AppDataStore {
     private(set) var activities: [Activity] = []
-    private var uid: String { Auth.auth().currentUser?.uid ?? "guest" }
 
+    private var activeUserID: String?
+    private var isBootstrappingUser = false
 
-    private let activitiesKey = "tempo_activities"
-    private func weekKey(_ ws: String) -> String { "tempo_week_\(ws)" }
+    private var currentUserID: String? {
+        activeUserID ?? Auth.auth().currentUser?.uid
+    }
 
-    init() { load() }
+    private var db: Firestore { Firestore.firestore() }
+
+    init() {
+        loadCachedActivities(for: nil)
+    }
+
+    // MARK: - Session
+
+    func bootstrapForCurrentUser() async {
+        guard let user = Auth.auth().currentUser else {
+            clearUserData()
+            return
+        }
+
+        if isBootstrappingUser, activeUserID == user.uid {
+            return
+        }
+
+        isBootstrappingUser = true
+        defer { isBootstrappingUser = false }
+
+        activeUserID = user.uid
+        loadCachedActivities(for: user.uid)
+
+        await ensureUserDocument(for: user)
+        await loadActivitiesFromFirebase()
+        _ = await loadWeekPlan(Self.currentWeekStart())
+    }
+
+    func clearUserData() {
+        activities = []
+        activeUserID = nil
+    }
 
     // MARK: - Activities
 
     func addActivity(_ activity: Activity) {
-        var all = activities
-        all.insert(activity, at: 0)
-        if let data = try? JSONEncoder().encode(all) {
-            UserDefaults.standard.set(data, forKey: activitiesKey)
-        }
-        activities = all
+        var updated = activities.filter { $0.id != activity.id }
+        updated.insert(activity, at: 0)
+        updated.sort { $0.completionDate > $1.completionDate }
+        activities = updated
+        cacheActivities(updated, for: currentUserID)
+
         saveActivity(activity)
-        saveWeeklyStats(weekStart: Self.currentWeekStart())
+        if let weekStart = Self.weekStart(forISODate: activity.completionDate) {
+            saveWeeklyStats(weekStart: weekStart)
+        }
     }
 
-    private func load() {
-        if let data = UserDefaults.standard.data(forKey: activitiesKey),
-           let decoded = try? JSONDecoder().decode([Activity].self, from: data) {
-           activities = decoded
+    func loadActivitiesFromFirebase() async {
+        guard let uid = currentUserID else {
+            loadCachedActivities(for: nil)
+            return
         }
+
+        do {
+            let snapshot = try await db.collection("users").document(uid)
+                .collection("activities")
+                .order(by: "completionDate", descending: true)
+                .getDocuments()
+
+            let fetched = snapshot.documents.compactMap(makeActivity(from:))
+            activities = fetched
+            cacheActivities(fetched, for: uid)
+        } catch {
+            print("Failed to load activities: \(error)")
+            loadCachedActivities(for: uid)
+        }
+    }
+
+    private func saveActivity(_ activity: Activity) {
+        guard let uid = currentUserID else { return }
+
+        db.collection("users").document(uid)
+            .collection("activities").document(activity.id)
+            .setData(activityDocumentData(for: activity)) { error in
+                if let error {
+                    print("Failed to save activity: \(error)")
+                }
+            }
+    }
+
+    private func loadCachedActivities(for userID: String?) {
+        guard let data = UserDefaults.standard.data(forKey: activitiesKey(for: userID)),
+              let decoded = try? JSONDecoder().decode([Activity].self, from: data) else {
+            activities = []
+            return
+        }
+        activities = decoded
+    }
+
+    private func cacheActivities(_ activities: [Activity], for userID: String?) {
+        guard let data = try? JSONEncoder().encode(activities) else { return }
+        UserDefaults.standard.set(data, forKey: activitiesKey(for: userID))
+    }
+
+    private func activityDocumentData(for activity: Activity) -> [String: Any] {
+        [
+            "id": activity.id,
+            "name": activity.name,
+            "completionDate": timestamp(fromISO: activity.completionDate),
+            "uploadDate": timestamp(fromISO: activity.uploadDate),
+            "distanceMiles": activity.distanceMiles,
+            "durationSeconds": activity.durationSeconds,
+            "avgPaceSecondsPerMile": activity.avgPaceSecondsPerMile,
+            "category": activity.category.rawValue,
+        ]
+    }
+
+    private func makeActivity(from document: QueryDocumentSnapshot) -> Activity? {
+        let data = document.data()
+
+        guard
+            let completionDate = isoDateString(from: data["completionDate"]),
+            let uploadDate = isoDateString(from: data["uploadDate"]) ?? isoDateString(from: data["completionDate"]),
+            let categoryRawValue = data["category"] as? String,
+            let category = RunCategory(rawValue: categoryRawValue)
+        else {
+            return nil
+        }
+
+        return Activity(
+            id: (data["id"] as? String) ?? document.documentID,
+            name: (data["name"] as? String) ?? "",
+            completionDate: completionDate,
+            uploadDate: uploadDate,
+            distanceMiles: doubleValue(from: data["distanceMiles"]),
+            durationSeconds: intValue(from: data["durationSeconds"]),
+            category: category
+        )
     }
 
     // MARK: - Week Plans
 
-    func loadWeekPlan(_ weekStart: String) -> [ScheduledRun] {
-        guard let data = UserDefaults.standard.data(forKey: weekKey(weekStart)),
-              let runs = try? JSONDecoder().decode([ScheduledRun].self, from: data)
-        else { return [] }
+    func cachedWeekPlan(_ weekStart: String) -> [ScheduledRun] {
+        guard let data = UserDefaults.standard.data(forKey: weekKey(weekStart, userID: currentUserID)),
+              let runs = try? JSONDecoder().decode([ScheduledRun].self, from: data) else {
+            return []
+        }
+
         return runs
     }
 
-    func saveWeekPlan(_ runs: [ScheduledRun], weekStart: String) {
-        if let data = try? JSONEncoder().encode(runs) {
-            UserDefaults.standard.set(data, forKey: weekKey(weekStart))
+    func loadWeekPlan(_ weekStart: String) async -> [ScheduledRun] {
+        let cached = cachedWeekPlan(weekStart)
+        guard let uid = currentUserID else { return cached }
+
+        do {
+            let document = try await db.collection("users").document(uid)
+                .collection("weekPlans").document(weekStart)
+                .getDocument()
+
+            guard document.exists else {
+                return cached
+            }
+
+            let runs = parseRuns(from: document.data()?["runs"])
+            cacheWeekPlan(runs, weekStart: weekStart, userID: uid)
+            return runs
+        } catch {
+            print("Failed to load week plan: \(error)")
+            return cached
         }
+    }
+
+    func saveWeekPlan(_ runs: [ScheduledRun], weekStart: String) {
+        cacheWeekPlan(runs, weekStart: weekStart, userID: currentUserID)
         saveWeekPlanToFirebase(runs, weekStart: weekStart)
     }
-    
+
     func saveWeekPlanToFirebase(_ runs: [ScheduledRun], weekStart: String) {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
-        let data = runs.map { run -> [String: Any] in
+        guard let uid = currentUserID else { return }
+
+        let payload: [[String: Any]] = runs.map { run in
             [
                 "id": run.id.uuidString,
                 "type": run.type.rawValue,
                 "day": run.day,
-                "timeOfDay": run.timeOfDay.rawValue,
-                "distanceMiles": run.distanceMiles
+                "time": run.timeOfDay.rawValue,
+                "distanceMiles": run.distanceMiles,
             ]
         }
+
         db.collection("users").document(uid)
             .collection("weekPlans").document(weekStart)
-            .setData(["runs": data, "weekStart": weekStart])
+            .setData(
+                [
+                    "weekStartDate": timestamp(fromISO: weekStart),
+                    "updatedAt": FieldValue.serverTimestamp(),
+                    "runs": payload,
+                ],
+                merge: true
+            ) { error in
+                if let error {
+                    print("Failed to save week plan: \(error)")
+                }
+            }
     }
 
     func loadWeekPlanFromFirebase(_ weekStart: String) async -> [ScheduledRun] {
-        guard let uid = Auth.auth().currentUser?.uid else { return [] }
-        do {
-            let doc = try await db.collection("users").document(uid)
-                .collection("weekPlans").document(weekStart)
-                .getDocument()
-            guard let runsData = doc.data()?["runs"] as? [[String: Any]] else { return [] }
-            return runsData.compactMap { dict -> ScheduledRun? in
-                guard
-                    let idStr = dict["id"] as? String, let id = UUID(uuidString: idStr),
-                    let typeStr = dict["type"] as? String, let type_ = RunType(rawValue: typeStr),
-                    let day = dict["day"] as? Int,
-                    let todStr = dict["timeOfDay"] as? String, let tod = TimeOfDay(rawValue: todStr),
-                    let miles = dict["distanceMiles"] as? Double
-                else { return nil }
-                return ScheduledRun(id: id, type: type_, day: day, timeOfDay: tod, distanceMiles: miles)
+        await loadWeekPlan(weekStart)
+    }
+
+    private func cacheWeekPlan(_ runs: [ScheduledRun], weekStart: String, userID: String?) {
+        guard let data = try? JSONEncoder().encode(runs) else { return }
+        UserDefaults.standard.set(data, forKey: weekKey(weekStart, userID: userID))
+    }
+
+    private func parseRuns(from rawValue: Any?) -> [ScheduledRun] {
+        guard let runsData = rawValue as? [[String: Any]] else { return [] }
+
+        return runsData.compactMap { dictionary in
+            guard
+                let idString = dictionary["id"] as? String,
+                let id = UUID(uuidString: idString),
+                let typeString = dictionary["type"] as? String,
+                let type = RunType(rawValue: typeString),
+                let day = dictionary["day"] as? Int,
+                let timeString = (dictionary["time"] as? String) ?? (dictionary["timeOfDay"] as? String),
+                let timeOfDay = TimeOfDay(rawValue: timeString)
+            else {
+                return nil
             }
-        } catch {
-            print("Failed to load week plan: \(error)")
-            return []
+
+            return ScheduledRun(
+                id: id,
+                type: type,
+                day: day,
+                timeOfDay: timeOfDay,
+                distanceMiles: doubleValue(from: dictionary["distanceMiles"])
+            )
         }
     }
 
@@ -138,8 +297,8 @@ final class AppDataStore {
         guard let start = Self.isoToDate(weekStart) else { return [] }
         let end = start.addingTimeInterval(7 * 86400)
         return activities.filter {
-            guard let d = Self.isoToDate($0.completionDate) else { return false }
-            return d >= start && d < end
+            guard let date = Self.isoToDate($0.completionDate) else { return false }
+            return date >= start && date < end
         }
     }
 
@@ -173,11 +332,11 @@ final class AppDataStore {
     }
 
     func weeklyReview(weekStart: String, plannedRuns: [ScheduledRun]? = nil) -> WeeklyReview {
-        let plannedRuns = plannedRuns ?? loadWeekPlan(weekStart)
+        let plannedRuns = plannedRuns ?? cachedWeekPlan(weekStart)
         let currentWeekActivities = weekActivities(weekStart)
         let matchedActivities = matchedActivitiesForPlan(plannedRuns: plannedRuns, activities: currentWeekActivities)
         let previousWeekStart = Self.shiftWeek(weekStart, by: -1)
-        let previousPlannedRuns = loadWeekPlan(previousWeekStart)
+        let previousPlannedRuns = cachedWeekPlan(previousWeekStart)
         let previousWeekActivities = weekActivities(previousWeekStart)
 
         var completedCounts: [RunType: Int] = [:]
@@ -207,7 +366,7 @@ final class AppDataStore {
     }
 
     func dailyMileagePoints(weekStart: String) -> [DailyMileagePoint] {
-        let plannedRuns = loadWeekPlan(weekStart)
+        let plannedRuns = cachedWeekPlan(weekStart)
         let weekActivities = weekActivities(weekStart)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -218,58 +377,18 @@ final class AppDataStore {
             let date = Self.isoToDate(dayISO)?.addingTimeInterval(Double(dayIndex) * 86400)
             let isoDate = date.map { formatter.string(from: $0) } ?? weekStart
             let dayActivities = weekActivities.filter { $0.completionDate == isoDate }
-            let label = shortWeekdayLabel(for: dayIndex)
 
             return DailyMileagePoint(
                 id: dayIndex,
                 dayIndex: dayIndex,
-                label: label,
+                label: shortWeekdayLabel(for: dayIndex),
                 plannedMiles: plannedRuns.filter { $0.day == dayIndex }.reduce(0) { $0 + $1.distanceMiles },
                 actualMiles: totalMiles(dayActivities)
             )
         }
     }
-  
+
     // MARK: - Firebase Sync
-    func saveActivity(_ activity: Activity) {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
-        do {
-            try db.collection("users").document(uid)
-                .collection("activities").document(activity.id)
-                .setData(from: activity)
-        } catch {
-            print("Failed to save activity: \(error)")
-        }
-    }
-
-    func loadActivitiesFromFirebase() async {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
-        do {
-            let snapshot = try await db.collection("users").document(uid)
-                .collection("activities")
-                .order(by: "completionDate", descending: true)
-                .getDocuments()
-            let fetched = try snapshot.documents.compactMap {
-                try $0.data(as: Activity.self)
-            }
-            activities = fetched.isEmpty ? [] : fetched
-            if let data = try? JSONEncoder().encode(fetched) {
-                UserDefaults.standard.set(data, forKey: activitiesKey)
-            }
-            
-        } catch {
-            print("Failed to load activities: \(error)")
-        }
-    }
-
-    private var db: Firestore { Firestore.firestore() }
-
-    private func userStatsCollection() throws -> CollectionReference {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            throw NSError(domain: "AuthError", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not logged in"])
-        }
-        return db.collection("users").document(uid).collection("weeklyStats")
-    }
 
     func saveWeeklyStats(weekStart: String) {
         let acts = weekActivities(weekStart)
@@ -280,6 +399,7 @@ final class AppDataStore {
             totalSeconds: acts.reduce(0) { $0 + $1.durationSeconds },
             avgPaceSeconds: avgPaceSeconds(acts)
         )
+
         do {
             try userStatsCollection()
                 .document(weekStart)
@@ -291,48 +411,91 @@ final class AppDataStore {
 
     func loadWeeklyStatsFromFirebase(weekStart: String) async -> WeeklyStats? {
         do {
-            let doc = try await userStatsCollection()
+            let document = try await userStatsCollection()
                 .document(weekStart)
                 .getDocument()
-            return try doc.data(as: WeeklyStats.self)
+            return try document.data(as: WeeklyStats.self)
         } catch {
             print("Failed to load weekly stats: \(error)")
             return nil
         }
     }
-  
+
     func saveProfile(_ profile: UserProfile) {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
-        do {
-            try db.collection("users").document(uid).setData(from: profile, merge: true)
-        } catch {
-            print("Failed to save profile: \(error)")
+        guard let uid = currentUserID else { return }
+
+        db.collection("users").document(uid).setData(
+            [
+                "fullName": profile.fullName,
+                "email": profile.email,
+                "weeklyMileageGoal": profile.weeklyMileageGoal,
+                "weeklyRunGoal": profile.weeklyRunGoal,
+                "allTimeMileGoal": profile.allTimeMileGoal,
+            ],
+            merge: true
+        ) { error in
+            if let error {
+                print("Failed to save profile: \(error)")
+            }
         }
     }
 
     func loadProfile() async -> UserProfile? {
-        guard let uid = Auth.auth().currentUser?.uid else { return nil }
+        guard let uid = currentUserID else { return nil }
+
         do {
-            let doc = try await db.collection("users").document(uid).getDocument()
-            return try doc.data(as: UserProfile.self)
+            let document = try await db.collection("users").document(uid).getDocument()
+            guard let data = document.data() else { return nil }
+
+            return UserProfile(
+                fullName: (data["fullName"] as? String) ?? (data["displayName"] as? String) ?? "",
+                email: (data["email"] as? String) ?? "",
+                weeklyMileageGoal: doubleValue(from: data["weeklyMileageGoal"]),
+                weeklyRunGoal: intValue(from: data["weeklyRunGoal"]),
+                allTimeMileGoal: doubleValue(from: data["allTimeMileGoal"])
+            )
         } catch {
             print("Failed to load profile: \(error)")
             return nil
         }
     }
-  
-    func clearUserData() {
-        activities = []
-        UserDefaults.standard.removeObject(forKey: activitiesKey)
+
+    private func ensureUserDocument(for user: User) async {
+        let userDocument = db.collection("users").document(user.uid)
+
+        do {
+            let snapshot = try await userDocument.getDocument()
+            let baseFields: [String: Any] = [
+                "displayName": user.displayName ?? "",
+                "email": user.email ?? "",
+                "profilePhotoUrl": user.photoURL?.absoluteString ?? "",
+            ]
+
+            if snapshot.exists {
+                try await userDocument.setData(baseFields, merge: true)
+            } else {
+                try await userDocument.setData(baseFields)
+            }
+        } catch {
+            print("Failed to ensure user document: \(error)")
+        }
     }
-  
+
+    private func userStatsCollection() throws -> CollectionReference {
+        guard let uid = currentUserID else {
+            throw NSError(domain: "AuthError", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not logged in"])
+        }
+
+        return db.collection("users").document(uid).collection("weeklyStats")
+    }
+
     // MARK: - Static Date Utilities
 
     static func currentWeekStart() -> String {
-        var cal = Calendar(identifier: .iso8601)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
-        let monday = cal.date(from: comps) ?? Date()
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+        let monday = calendar.date(from: components) ?? Date()
         return dateToISO(monday)
     }
 
@@ -351,29 +514,100 @@ final class AppDataStore {
 
     static func formatDisplayDate(_ iso: String) -> String {
         guard let date = isoToDate(iso) else { return iso }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "MMM d"
-        fmt.timeZone = TimeZone(identifier: "UTC")
-        return fmt.string(from: date)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter.string(from: date)
     }
 
     static func parseDuration(_ input: String) -> Int? {
         let parts = input.split(separator: ":", omittingEmptySubsequences: false).map { Int($0) }
         guard !parts.isEmpty, parts.allSatisfy({ $0 != nil }) else { return nil }
-        let vals = parts.compactMap { $0 }
-        switch vals.count {
-        case 3: return vals[0] * 3600 + vals[1] * 60 + vals[2]
-        case 2: return vals[0] * 60 + vals[1]
-        default: return nil
+        let values = parts.compactMap { $0 }
+        switch values.count {
+        case 3:
+            return values[0] * 3600 + values[1] * 60 + values[2]
+        case 2:
+            return values[0] * 60 + values[1]
+        default:
+            return nil
         }
     }
 
+    static func weekStart(forISODate iso: String) -> String? {
+        guard let date = isoToDate(iso) else { return nil }
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        guard let monday = calendar.date(from: components) else { return nil }
+        return dateToISO(monday)
+    }
+
     private static let isoFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
     }()
+
+    // MARK: - Private Helpers
+
+    private func activitiesKey(for userID: String?) -> String {
+        "tempo_activities_\(userID ?? "guest")"
+    }
+
+    private func weekKey(_ weekStart: String, userID: String?) -> String {
+        "tempo_week_\(userID ?? "guest")_\(weekStart)"
+    }
+
+    private func timestamp(fromISO iso: String) -> Timestamp {
+        Timestamp(date: Self.isoToDate(iso) ?? Date())
+    }
+
+    private func isoDateString(from value: Any?) -> String? {
+        if let timestamp = value as? Timestamp {
+            return Self.dateToISO(timestamp.dateValue())
+        }
+
+        if let date = value as? Date {
+            return Self.dateToISO(date)
+        }
+
+        if let iso = value as? String {
+            if iso.count >= 10 {
+                return String(iso.prefix(10))
+            }
+            return iso
+        }
+
+        return nil
+    }
+
+    private func doubleValue(from value: Any?) -> Double {
+        switch value {
+        case let double as Double:
+            double
+        case let int as Int:
+            Double(int)
+        case let number as NSNumber:
+            number.doubleValue
+        default:
+            0
+        }
+    }
+
+    private func intValue(from value: Any?) -> Int {
+        switch value {
+        case let int as Int:
+            int
+        case let double as Double:
+            Int(double)
+        case let number as NSNumber:
+            number.intValue
+        default:
+            0
+        }
+    }
 
     private func matchedActivitiesForPlan(plannedRuns: [ScheduledRun], activities: [Activity]) -> [Activity] {
         var remaining = activities.sorted { lhs, rhs in

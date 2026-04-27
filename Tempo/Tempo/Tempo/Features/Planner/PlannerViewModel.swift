@@ -25,6 +25,7 @@ final class PlannerViewModel {
         } else {
             scheduledRuns.append(ScheduledRun(type: type, day: day, timeOfDay: timeOfDay))
         }
+        expandedDays.insert(day)
     }
 
     func moveRun(id: UUID, to day: Int, timeOfDay: TimeOfDay) {
@@ -33,6 +34,7 @@ final class PlannerViewModel {
         scheduledRuns[movedIdx].day = day
         scheduledRuns[movedIdx].timeOfDay = timeOfDay
         if let conflictID { scheduledRuns.removeAll { $0.id == conflictID } }
+        expandedDays.insert(day)
     }
 
     func removeRun(id: UUID) {
@@ -50,19 +52,17 @@ final class PlannerViewModel {
 
     // MARK: - Week navigation
 
-    func goToPrevWeek(store: AppDataStore) {
+    func goToPrevWeek(store: AppDataStore) async {
         store.saveWeekPlan(scheduledRuns, weekStart: currentWeekStart)
         currentWeekStart = AppDataStore.shiftWeek(currentWeekStart, by: -1)
-        let saved = store.loadWeekPlan(currentWeekStart)
-        scheduledRuns = saved.isEmpty ? [] : saved
+        scheduledRuns = await store.loadWeekPlan(currentWeekStart)
         expandedDays = []
     }
 
-    func goToNextWeek(store: AppDataStore) {
+    func goToNextWeek(store: AppDataStore) async {
         store.saveWeekPlan(scheduledRuns, weekStart: currentWeekStart)
         currentWeekStart = AppDataStore.shiftWeek(currentWeekStart, by: 1)
-        let saved = store.loadWeekPlan(currentWeekStart)
-        scheduledRuns = saved.isEmpty ? [] : saved
+        scheduledRuns = await store.loadWeekPlan(currentWeekStart)
         expandedDays = []
     }
 

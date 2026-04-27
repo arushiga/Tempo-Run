@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PlannerGridView: View {
     let viewModel: PlannerViewModel
+    @State private var draftMiles: [MileageFieldID: String] = [:]
+    @FocusState private var focusedField: MileageFieldID?
 
     var body: some View {
         VStack(spacing: 18) {
@@ -13,7 +15,19 @@ struct PlannerGridView: View {
                         .foregroundStyle(TempoColor.slate)
                         .frame(width: 16, alignment: .leading)
                     ForEach(Array(viewModel.dayLabels.enumerated()), id: \.offset) { index, _ in
-                        PlannerCellView(day: index, timeOfDay: timeOfDay, viewModel: viewModel)
+                        let scheduledRun = viewModel.scheduledRun(for: index, timeOfDay: timeOfDay)
+                        PlannerCellView(
+                            day: index,
+                            timeOfDay: timeOfDay,
+                            viewModel: viewModel,
+                            scheduledRun: scheduledRun,
+                            draftText: scheduledRun.map {
+                                binding(for: MileageFieldID(runID: $0.id, context: "cell"), run: $0)
+                            },
+                            focusedField: $focusedField,
+                            onCancelEditing: cancelEditing,
+                            onCommitEditing: commitEditing
+                        )
                     }
                 }
             }
@@ -69,7 +83,14 @@ struct PlannerGridView: View {
                                 Image(systemName: run.type.symbolName).foregroundStyle(run.type.color).font(.caption)
                                 Text(run.type.shortLabel).font(.caption).foregroundStyle(TempoColor.ink)
                                 Spacer()
-                                MileageTextField(run: run, viewModel: viewModel)
+                                MileageTextField(
+                                    run: run,
+                                    fieldID: MileageFieldID(runID: run.id, context: "expanded"),
+                                    text: binding(for: MileageFieldID(runID: run.id, context: "expanded"), run: run),
+                                    focusedField: $focusedField,
+                                    onCancel: cancelEditing,
+                                    onCommit: commitEditing
+                                )
                                     .frame(width: 82)
                             }
                             Slider(
@@ -80,6 +101,7 @@ struct PlannerGridView: View {
                                 in: 0...26.2, step: 0.1
                             )
                             .tint(run.type.color)
+                            SliderTickMarks()
                         }
                         .padding(12)
                         .background(TempoColor.surfaceMuted)
@@ -100,10 +122,14 @@ struct PlannerCellView: View {
     let day: Int
     let timeOfDay: TimeOfDay
     let viewModel: PlannerViewModel
+    let scheduledRun: ScheduledRun?
+    let draftText: Binding<String>?
+    var focusedField: FocusState<MileageFieldID?>.Binding
+    let onCancelEditing: () -> Void
+    let onCommitEditing: () -> Void
     @State private var isTargeted = false
 
     var body: some View {
-        let scheduledRun = viewModel.scheduledRun(for: day, timeOfDay: timeOfDay)
         VStack(spacing: 4) {
             if let scheduledRun {
                 Image(systemName: scheduledRun.type.symbolName)
@@ -113,7 +139,14 @@ struct PlannerCellView: View {
                     .draggable(PlannerDragItem.scheduledRun(scheduledRun)) {
                         PlannerDragPreview(runType: scheduledRun.type)
                     }
-                MileageTextField(run: scheduledRun, viewModel: viewModel)
+                MileageTextField(
+                    run: scheduledRun,
+                    fieldID: MileageFieldID(runID: scheduledRun.id, context: "cell"),
+                    text: draftText ?? .constant(MileageFormatter.format(scheduledRun.distanceMiles)),
+                    focusedField: focusedField,
+                    onCancel: onCancelEditing,
+                    onCommit: onCommitEditing
+                )
                     .frame(height: 20)
             } else {
                 Image(systemName: "plus")
@@ -162,19 +195,25 @@ struct PlannerCellView: View {
     }
 }
 
+struct MileageFieldID: Hashable {
+    let runID: UUID
+    let context: String
+}
+
 private struct MileageTextField: View {
     let run: ScheduledRun
-    let viewModel: PlannerViewModel
-
-    @State private var text: String = ""
-    @FocusState private var isFocused: Bool
+    let fieldID: MileageFieldID
+    @Binding var text: String
+    var focusedField: FocusState<MileageFieldID?>.Binding
+    let onCancel: () -> Void
+    let onCommit: () -> Void
 
     var body: some View {
         TextField("0.0", text: $text)
             .font(.system(size: 11, weight: .bold))
             .multilineTextAlignment(.center)
             .keyboardType(.decimalPad)
-            .focused($isFocused)
+            .focused(focusedField, equals: fieldID)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .padding(.horizontal, 0)
@@ -183,40 +222,112 @@ private struct MileageTextField: View {
             .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(isFocused ? run.type.color : TempoColor.line, lineWidth: 1)
+                    .stroke(focusedField.wrappedValue == fieldID ? run.type.color : TempoColor.line, lineWidth: 1)
             )
-            .onAppear { syncTextFromRun() }
             .onChange(of: run.distanceMiles) { _, _ in
-                if !isFocused { syncTextFromRun() }
-            }
-            .onChange(of: isFocused) { _, focused in
-                if focused {
-                    text = run.distanceMiles == 0 ? "" : formatted(run.distanceMiles)
-                } else {
-                    commit()
+                if focusedField.wrappedValue != fieldID {
+                    text = formatted(run.distanceMiles)
                 }
             }
-            .onSubmit { commit() }
-    }
+            .onAppear {
+                text = formatted(run.distanceMiles)
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    if focusedField.wrappedValue == fieldID {
+                        Button {
+                            onCancel()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
 
-    private func syncTextFromRun() {
-        text = run.distanceMiles == 0 ? "0.0" : formatted(run.distanceMiles)
-    }
+                        Spacer()
 
-    private func commit() {
-        let normalized = text
-            .replacingOccurrences(of: "mi", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let value = max(0, min(Double(normalized) ?? 0, 26.2))
-        viewModel.setDistance(value, for: run.id)
-        text = formatted(value)
+                        Button {
+                            onCommit()
+                        } label: {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                    }
+                }
+            }
     }
 
     private func formatted(_ value: Double) -> String {
+        MileageFormatter.format(value)
+    }
+}
+
+private enum MileageFormatter {
+    static func format(_ value: Double) -> String {
         if value.rounded() == value {
             return "\(Int(value))"
         }
         return String(format: "%.1f", value)
+    }
+}
+
+private struct SliderTickMarks: View {
+    private let marks = [0, 5, 10, 15, 20, 26]
+
+    var body: some View {
+        HStack {
+            ForEach(marks, id: \.self) { mark in
+                VStack(spacing: 3) {
+                    Rectangle()
+                        .fill(TempoColor.lineStrong)
+                        .frame(width: 1, height: mark == 0 || mark == 26 ? 7 : 5)
+                    Text("\(mark)")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(TempoColor.muted)
+                }
+                if mark != marks.last {
+                    Spacer()
+                }
+            }
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
+private extension PlannerGridView {
+    func binding(for fieldID: MileageFieldID, run: ScheduledRun) -> Binding<String> {
+        Binding(
+            get: {
+                draftMiles[fieldID] ?? MileageFormatter.format(run.distanceMiles)
+            },
+            set: { newValue in
+                draftMiles[fieldID] = newValue
+            }
+        )
+    }
+
+    func commitEditing() {
+        guard let activeField = focusedField else { return }
+        let rawValue = draftMiles[activeField] ?? "0"
+        let normalized = rawValue
+            .replacingOccurrences(of: "mi", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let miles = max(0, min(Double(normalized) ?? 0, 26.2))
+        viewModel.setDistance(miles, for: activeField.runID)
+        syncDrafts(for: activeField.runID, value: miles)
+        focusedField = nil
+    }
+
+    func cancelEditing() {
+        guard let activeField = focusedField else { return }
+        let currentMiles = viewModel.scheduledRuns.first(where: { $0.id == activeField.runID })?.distanceMiles ?? 0
+        syncDrafts(for: activeField.runID, value: currentMiles)
+        focusedField = nil
+    }
+
+    func syncDrafts(for runID: UUID, value: Double) {
+        let formatted = MileageFormatter.format(value)
+        for key in draftMiles.keys where key.runID == runID {
+            draftMiles[key] = formatted
+        }
     }
 }
 
