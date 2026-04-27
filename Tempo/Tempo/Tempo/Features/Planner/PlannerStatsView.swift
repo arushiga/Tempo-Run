@@ -112,8 +112,10 @@ private struct PlannerStatTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(TempoColor.slate)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
 
             Text("\(value)")
                 .font(.title2.weight(.bold))

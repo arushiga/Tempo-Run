@@ -19,10 +19,7 @@ struct PlannerView: View {
         .background(TempoGradient.appBackground.ignoresSafeArea())
         .navigationTitle("Planner")
         .task {
-            let runs = await store.loadWeekPlanFromFirebase(viewModel.currentWeekStart)
-            if !runs.isEmpty {
-                viewModel.scheduledRuns = runs
-            }
+            viewModel.scheduledRuns = await store.loadWeekPlan(viewModel.currentWeekStart)
         }
         .onChange(of: viewModel.scheduledRuns) { _, _ in
             viewModel.saveCurrent(store: store)
@@ -56,7 +53,11 @@ struct PlannerView: View {
 
     private var weekNavBar: some View {
         HStack {
-            Button { viewModel.goToPrevWeek(store: store) } label: {
+            Button {
+                Task {
+                    await viewModel.goToPrevWeek(store: store)
+                }
+            } label: {
                 Image(systemName: "chevron.left.circle.fill")
                     .font(.title2).foregroundStyle(TempoColor.primary)
             }
@@ -75,7 +76,11 @@ struct PlannerView: View {
                 .buttonStyle(.plain)
             }
             Spacer()
-            Button { viewModel.goToNextWeek(store: store) } label: {
+            Button {
+                Task {
+                    await viewModel.goToNextWeek(store: store)
+                }
+            } label: {
                 Image(systemName: "chevron.right.circle.fill")
                     .font(.title2).foregroundStyle(TempoColor.primary)
             }
