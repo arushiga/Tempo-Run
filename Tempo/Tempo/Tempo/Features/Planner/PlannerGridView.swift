@@ -2,8 +2,10 @@ import SwiftUI
 
 struct PlannerGridView: View {
     let viewModel: PlannerViewModel
-    @State private var draftMiles: [MileageFieldID: String] = [:]
-    @FocusState private var focusedField: MileageFieldID?
+    @Binding var draftMiles: [MileageFieldID: String]
+    var focusedField: FocusState<MileageFieldID?>.Binding
+    let onCancel: () -> Void
+    let onCommit: () -> Void
 
     var body: some View {
         VStack(spacing: 18) {
@@ -24,9 +26,9 @@ struct PlannerGridView: View {
                             draftText: scheduledRun.map {
                                 binding(for: MileageFieldID(runID: $0.id, context: "cell"), run: $0)
                             },
-                            focusedField: $focusedField,
-                            onCancelEditing: cancelEditing,
-                            onCommitEditing: commitEditing
+                            focusedField: focusedField,
+                            onCancelEditing: onCancel,
+                            onCommitEditing: onCommit
                         )
                     }
                 }
@@ -90,9 +92,9 @@ struct PlannerGridView: View {
                                     run: run,
                                     fieldID: MileageFieldID(runID: run.id, context: "expanded"),
                                     text: binding(for: MileageFieldID(runID: run.id, context: "expanded"), run: run),
-                                    focusedField: $focusedField,
-                                    onCancel: cancelEditing,
-                                    onCommit: commitEditing
+                                    focusedField: focusedField,
+                                    onCancel: onCancel,
+                                    onCommit: onCommit
                                 )
                                     .frame(width: 82)
                             }
@@ -239,27 +241,6 @@ private struct MileageTextField: View {
             .onAppear {
                 text = formatted(run.distanceMiles)
             }
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    if focusedField.wrappedValue == fieldID {
-                        Button {
-                            onCancel()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-
-                        Spacer()
-
-                        Button {
-                            onCommit()
-                        } label: {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                    }
-                }
-            }
     }
 
     private func formatted(_ value: Double) -> String {
@@ -267,7 +248,7 @@ private struct MileageTextField: View {
     }
 }
 
-private enum MileageFormatter {
+enum MileageFormatter {
     static func format(_ value: Double) -> String {
         if value.rounded() == value {
             return "\(Int(value))"
@@ -309,32 +290,6 @@ private extension PlannerGridView {
                 draftMiles[fieldID] = newValue
             }
         )
-    }
-
-    func commitEditing() {
-        guard let activeField = focusedField else { return }
-        let rawValue = draftMiles[activeField] ?? "0"
-        let normalized = rawValue
-            .replacingOccurrences(of: "mi", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let miles = max(0, min(Double(normalized) ?? 0, 26.2))
-        viewModel.setDistance(miles, for: activeField.runID)
-        syncDrafts(for: activeField.runID, value: miles)
-        focusedField = nil
-    }
-
-    func cancelEditing() {
-        guard let activeField = focusedField else { return }
-        let currentMiles = viewModel.scheduledRuns.first(where: { $0.id == activeField.runID })?.distanceMiles ?? 0
-        syncDrafts(for: activeField.runID, value: currentMiles)
-        focusedField = nil
-    }
-
-    func syncDrafts(for runID: UUID, value: Double) {
-        let formatted = MileageFormatter.format(value)
-        for key in draftMiles.keys where key.runID == runID {
-            draftMiles[key] = formatted
-        }
     }
 
     func dayOfMonthLabel(for dayIndex: Int) -> String {

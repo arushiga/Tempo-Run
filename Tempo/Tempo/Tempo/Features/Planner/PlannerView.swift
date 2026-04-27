@@ -3,13 +3,21 @@ import SwiftUI
 struct PlannerView: View {
     @State private var viewModel = PlannerViewModel()
     @Environment(AppDataStore.self) private var store
+    @FocusState private var focusedField: MileageFieldID?
+    @State private var draftMiles: [MileageFieldID: String] = [:]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 plannerHeader
                 weekNavBar
-                PlannerGridView(viewModel: viewModel)
+                PlannerGridView(
+                    viewModel: viewModel,
+                    draftMiles: $draftMiles,
+                    focusedField: $focusedField,
+                    onCancel: cancelEditing,
+                    onCommit: commitEditing
+                )
                 RunTypePickerView()
                 PlannerStatsView(viewModel: viewModel)
             }
@@ -22,9 +30,55 @@ struct PlannerView: View {
             viewModel.scheduledRuns = await store.loadWeekPlan(viewModel.currentWeekStart)
         }
         .onChange(of: viewModel.scheduledRuns) { _, _ in
-            viewModel.saveCurrent(store: store)
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                viewModel.saveCurrent(store: store)
+            }
         }
         .onDisappear { viewModel.saveCurrent(store: store) }
+        .overlay(alignment: .bottom) {
+            if focusedField != nil {
+                HStack {
+                    Button { cancelEditing() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .padding(12)
+                    }
+                    Spacer()
+                    Button { commitEditing() } label: {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .padding(12)
+                    }
+                }
+                .background(.bar)
+            }
+        }
+    }
+  
+    func commitEditing() {
+        guard let activeField = focusedField else { return }
+        let rawValue = draftMiles[activeField] ?? "0"
+        let normalized = rawValue
+            .replacingOccurrences(of: "mi", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let miles = max(0, min(Double(normalized) ?? 0, 26.2))
+        viewModel.setDistance(miles, for: activeField.runID)
+        let formatted = MileageFormatter.format(miles)
+        for key in draftMiles.keys where key.runID == activeField.runID {
+            draftMiles[key] = formatted
+        }
+        focusedField = nil
+    }
+
+    func cancelEditing() {
+        guard let activeField = focusedField else { return }
+        let currentMiles = viewModel.scheduledRuns.first(where: { $0.id == activeField.runID })?.distanceMiles ?? 0
+        let formatted = MileageFormatter.format(currentMiles)
+        for key in draftMiles.keys where key.runID == activeField.runID {
+            draftMiles[key] = formatted
+        }
+        focusedField = nil
     }
 
     private var plannerHeader: some View {
