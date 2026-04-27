@@ -22,9 +22,6 @@ struct ActivityView: View {
         }
         .background(TempoGradient.appBackground.ignoresSafeArea())
         .navigationTitle("Activity")
-        .task {
-            await store.loadActivitiesFromFirebase()
-        }
     }
 
     private var heroCard: some View {

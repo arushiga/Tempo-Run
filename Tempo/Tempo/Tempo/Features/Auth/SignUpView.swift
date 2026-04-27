@@ -11,6 +11,10 @@ struct SignUpView: View {
     @State private var showsPassword = false
     @State private var showsConfirmPassword = false
 
+    private var passwordMeetsMinimum: Bool {
+        password.count >= 8
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -25,39 +29,35 @@ struct SignUpView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 12) {
-            Circle()
-                .fill(.white.opacity(0.2))
-                .frame(width: 84, height: 84)
-                .overlay {
-                      Image(systemName: "figure.run")
-                          .font(.system(size: 36))
-                          .foregroundStyle(.white)
-                }
-                .overlay {
-                    Circle()
-                        .stroke(.white.opacity(0.3), lineWidth: 1)
-                }
+        VStack(alignment: .leading, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(TempoColor.primary.opacity(0.10))
+                    .frame(width: 68, height: 68)
+                Image(systemName: "figure.run")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(TempoColor.primary)
+            }
 
-            Text("Start Your Journey")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Start Your Journey")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(TempoColor.ink)
 
-            Text("Create an account to track your runs")
-                .font(.headline)
-                .foregroundStyle(.white.opacity(0.9))
+                Text("Create an account to track your runs.")
+                    .font(.subheadline)
+                    .foregroundStyle(TempoColor.slate)
+            }
         }
-        .foregroundStyle(.white)
-        .padding(28)
+        .padding(24)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [TempoColor.ink, TempoColor.primary],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(TempoColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(TempoColor.line, lineWidth: 1)
         )
     }
 
@@ -77,7 +77,7 @@ struct SignUpView: View {
 
                 Text("Must be at least 8 characters")
                     .font(.caption)
-                    .foregroundStyle(TempoColor.slate)
+                    .foregroundStyle(password.isEmpty || passwordMeetsMinimum ? TempoColor.slate : .red)
                     .padding(.top, -8)
 
                 AuthSecureField(
@@ -105,7 +105,7 @@ struct SignUpView: View {
                     }
                 }
                 .buttonStyle(TempoPrimaryButtonStyle())
-                .disabled(auth.isLoading || !acceptsTerms || password != confirmPassword)
+                .disabled(auth.isLoading || !acceptsTerms || password != confirmPassword || !passwordMeetsMinimum)
               
                 if let error = auth.errorMessage {
                     Text(error)

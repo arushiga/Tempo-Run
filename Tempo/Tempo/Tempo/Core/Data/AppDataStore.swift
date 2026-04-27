@@ -44,11 +44,20 @@ struct UserProfile: Codable {
     var weeklyMileageGoal: Double
     var weeklyRunGoal: Int
     var allTimeMileGoal: Double
+
+    static let defaultGoals = UserProfile(
+        fullName: "",
+        email: "",
+        weeklyMileageGoal: 25,
+        weeklyRunGoal: 5,
+        allTimeMileGoal: 500
+    )
 }
 
 @Observable
 final class AppDataStore {
     private(set) var activities: [Activity] = []
+    private(set) var profile = UserProfile.defaultGoals
 
     private var activeUserID: String?
     private var isBootstrappingUser = false
@@ -83,11 +92,13 @@ final class AppDataStore {
 
         await ensureUserDocument(for: user)
         await loadActivitiesFromFirebase()
+        _ = await loadProfile()
         _ = await loadWeekPlan(Self.currentWeekStart())
     }
 
     func clearUserData() {
         activities = []
+        profile = .defaultGoals
         activeUserID = nil
     }
 
@@ -423,6 +434,7 @@ final class AppDataStore {
 
     func saveProfile(_ profile: UserProfile) {
         guard let uid = currentUserID else { return }
+        self.profile = profile
 
         db.collection("users").document(uid).setData(
             [
@@ -447,17 +459,30 @@ final class AppDataStore {
             let document = try await db.collection("users").document(uid).getDocument()
             guard let data = document.data() else { return nil }
 
-            return UserProfile(
+            let loadedProfile = UserProfile(
                 fullName: (data["fullName"] as? String) ?? (data["displayName"] as? String) ?? "",
                 email: (data["email"] as? String) ?? "",
-                weeklyMileageGoal: doubleValue(from: data["weeklyMileageGoal"]),
-                weeklyRunGoal: intValue(from: data["weeklyRunGoal"]),
-                allTimeMileGoal: doubleValue(from: data["allTimeMileGoal"])
+                weeklyMileageGoal: max(doubleValue(from: data["weeklyMileageGoal"]), UserProfile.defaultGoals.weeklyMileageGoal),
+                weeklyRunGoal: max(intValue(from: data["weeklyRunGoal"]), UserProfile.defaultGoals.weeklyRunGoal),
+                allTimeMileGoal: max(doubleValue(from: data["allTimeMileGoal"]), UserProfile.defaultGoals.allTimeMileGoal)
             )
+            profile = loadedProfile
+            return loadedProfile
         } catch {
             print("Failed to load profile: \(error)")
             return nil
         }
+    }
+
+    func updateGoals(weeklyMileageGoal: Double, weeklyRunGoal: Int, allTimeMileGoal: Double) {
+        let nextProfile = UserProfile(
+            fullName: profile.fullName.isEmpty ? (Auth.auth().currentUser?.displayName ?? "") : profile.fullName,
+            email: profile.email.isEmpty ? (Auth.auth().currentUser?.email ?? "") : profile.email,
+            weeklyMileageGoal: weeklyMileageGoal,
+            weeklyRunGoal: weeklyRunGoal,
+            allTimeMileGoal: allTimeMileGoal
+        )
+        saveProfile(nextProfile)
     }
 
     private func ensureUserDocument(for user: User) async {

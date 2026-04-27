@@ -17,6 +17,7 @@ struct ProfileView: View {
     private var weekMiles: Double { store.totalMiles(weekActs) }
     private var mostRecent: Activity? { store.mostRecentActivity() }
     private var weeklyReview: WeeklyReview { store.weeklyReview(weekStart: AppDataStore.currentWeekStart()) }
+    private var currentRunStreak: Int { consecutiveRunDayStreak() }
     private var memberSinceText: String {
         guard let date = auth.user?.metadata.creationDate else { return "Member since --/--/----" }
         let formatter = DateFormatter()
@@ -40,9 +41,6 @@ struct ProfileView: View {
         }
         .background(TempoGradient.appBackground.ignoresSafeArea())
         .navigationTitle("Profile")
-        .task {
-                await store.loadActivitiesFromFirebase()
-        }
     }
 
     // MARK: - Hero
@@ -219,7 +217,7 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Achievements").font(.title3.weight(.semibold)).foregroundStyle(TempoColor.ink)
                 achievement("First Run", icon: "figure.run", unlocked: totalRuns >= 1, detail: "Log your first run")
-                achievement("5 Run Streak", icon: "flame.fill", unlocked: totalRuns >= 5, detail: "Complete 5 runs")
+                achievement("5 Run Streak", icon: "flame.fill", unlocked: currentRunStreak >= 5, detail: "Run on 5 consecutive days")
                 achievement("10 Miles Club", icon: "location.fill", unlocked: totalMiles >= 10, detail: "Run 10 total miles")
                 achievement("25 Miles Club", icon: "bolt.heart.fill", unlocked: totalMiles >= 25, detail: "Run 25 total miles")
                 achievement("100 Miles", icon: "target", unlocked: totalMiles >= 100, detail: "Run 100 total miles")
@@ -249,6 +247,37 @@ struct ProfileView: View {
         let first = parts.first?.first.map(String.init) ?? ""
         let last  = parts.count > 1 ? parts.last?.first.map(String.init) ?? "" : ""
         return (first + last).uppercased()
+    }
+
+    private func consecutiveRunDayStreak() -> Int {
+        let uniqueDates = Set(allActs.map(\.completionDate))
+        let sortedDates = uniqueDates
+            .compactMap(parseISODate)
+            .sorted(by: >)
+
+        guard let firstDate = sortedDates.first else { return 0 }
+
+        var streak = 1
+        var previousDate = firstDate
+
+        for date in sortedDates.dropFirst() {
+            let daysBetween = Calendar(identifier: .iso8601).dateComponents([.day], from: date, to: previousDate).day ?? 0
+            if daysBetween == 1 {
+                streak += 1
+                previousDate = date
+            } else if daysBetween > 1 {
+                break
+            }
+        }
+
+        return streak
+    }
+
+    private func parseISODate(_ iso: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter.date(from: iso)
     }
 }
 
